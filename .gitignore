@@ -1,0 +1,35 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+pip-wheel-metadata/
+*.egg-info/
+*.egg
+
+# --- Environment & Secrets ---
+.env
+.env.*
+!*.env.example
+
+# --- IDE / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Node / Frontend (falls du UI baust) ---
+node_modules/
+dist/
+build/
+.cache/
+
+# --- Logs & Temp ---
+*.log
+*.tmp
+*.bak
+*.swp
