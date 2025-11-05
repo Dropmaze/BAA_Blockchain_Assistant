@@ -1,0 +1,6 @@
+agno
+fastmcp
+web3
+python-dotenv
+uvicorn
+requests

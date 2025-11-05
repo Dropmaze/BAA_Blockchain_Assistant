@@ -159,9 +159,6 @@ async def web3_lifespan(server: FastMCP) -> AsyncIterator[Web3Context]:
 
 # --- Initialize FastMCP Server ---
 mcp = FastMCP(
-    tool_id="mcp_evm",
-    description="MCP server for interacting with the a local Ethereum Blockchain",
-    lifespan=web3_lifespan,
     host=os.getenv("HOST", "0.0.0.0"),
     port=int(os.getenv("PORT", "8090")) # Ensure port is int
 )
