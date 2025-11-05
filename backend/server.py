@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from dotenv import load_dotenv
+from pathlib import Path
 from web3 import Web3
 from web3.exceptions import ContractLogicError
 from web3.contract import Contract # Import Contract type hint
@@ -14,8 +15,9 @@ from typing import Set
 from mcp.server.fastmcp import FastMCP, Context
 #from fastmcp import FastMCP, Context
 
-# Load environment variables from .env file
-load_dotenv()
+#Load environment variables
+BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / ".env")
 
 # --- Helper function ---
 def parse_address_list(env_value: str | None) -> Set[str]:
