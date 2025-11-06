@@ -162,8 +162,10 @@ async def web3_lifespan(server: FastMCP) -> AsyncIterator[Web3Context]:
 # --- Initialize FastMCP Server ---
 mcp = FastMCP(
     host=os.getenv("HOST", "0.0.0.0"),
-    port=int(os.getenv("PORT", "8090")) # Ensure port is int
+    port=int(os.getenv("PORT", "8090")), # Ensure port is int
+    lifespan=web3_lifespan
 )
+
 
 # --- MCP Tools ---
 
@@ -197,6 +199,7 @@ async def get_eth_balance(ctx: Context, address: str) -> str:
         error_msg = f"Error getting ETH balance for {address}: {e}"
         print(error_msg)
         return error_msg
+
 
 # --- Send ETH Tool ---
 @mcp.tool()

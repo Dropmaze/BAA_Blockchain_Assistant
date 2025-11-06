@@ -1,57 +1,53 @@
+import os
+import sys
 import asyncio
-
 from textwrap import dedent
-
-from agno.agent import Agent
+from agno.agent.agent import Agent
 from agno.models.ollama import Ollama
+from agno.os import AgentOS
+from agno.os.interfaces.agui import AGUI
 from agno.tools.mcp import MCPTools
-from mcp import StdioServerParameters
+import uvicorn
 
-from agno.app.agui.app import AGUIApp
+if sys.platform.startswith("win"):
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
+#The directory where this file (mcp_evm.py) is located
+ROOT = os.path.dirname(os.path.abspath(__file__))
+#Full path to your server.py file
+SERVER_PATH = os.path.join(ROOT, "server.py") 
 
-# MCP server to access the filesystem (via `npx`)
-#async with MCPTools(
-#        f"fastmcp run /Users/fbweinga/src/AI/Agno/mcp_evm/server.py",  
-#    ) as mcp_tools:
-async def run_server():
-    async with MCPTools(f"/Users/fbweinga/src/AI/Agno/.venv/bin/python /Users/fbweinga/src/AI/Agno/mcp_evm/server.py") as mcp_tools:
+async def main():
+    # MCP-Server start
+    async with MCPTools(f'python "{SERVER_PATH}"') as mcp_tools:
         agent = Agent(
-            model=Ollama(id="qwen2.5:3b"),
+            name="Blockchain Assistent",
+            model=Ollama(id=os.getenv("LLM_MODEL", "qwen2.5:3b")),
             tools=[mcp_tools],
             instructions=dedent("""\
-                You are a Ethereum agent. Help users explore the blockchain.
-
-                - Check the balance of a given Address
+                Du bist ein Ethereum-Agent. Antworte ausschließlich auf Deutsch.
+                Verwende klare, knappe Formulierungen und bleibe technisch präzise.
             """),
             markdown=True,
-            show_tool_calls=True,
-            #debug_mode=True,
+            debug_mode=True,
         )
 
-        # Run the agent
-        #await agent.aprint_response(message, stream=True)
+        agent_os = AgentOS(agents=[agent], interfaces=[AGUI(agent=agent)])
+        app = agent_os.get_app()
 
-
-        # Setup the AG-UI app
-        agui_app = AGUIApp(
-            agent=agent,
-            name="AG-UI Agno Agent",
-            app_id="agno_agent",
+        config = uvicorn.Config(
+            app=app,
+            host="127.0.0.1",
+            port=8000,
+            reload=False,
+            loop="asyncio",
         )
-        app = agui_app.get_app()
-
-        # Serve the app, effectively exposing your Agno Agent
-        agui_app.serve(app="agno_agent:app", port=8000, reload=True)
+        server = uvicorn.Server(config)
+        await server.serve()
 
 
 if __name__ == "__main__":
-    asyncio.run(run_server())
+    asyncio.run(main())
 
     # Basic example - exploring project license
-    #asyncio.run(run_agent("What is the balance of address 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266?"))
-    #asyncio.run(run_agent("Please send 1 Token to address 0x70997970C51812dc3A010C7d01b50e0d17dc79C8"))
-    #asyncio.run(run_agent("Please send 2 Token to address 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"))
-    #asyncio.run(run_agent("Please send 3 Token to address 0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65"))
-    #asyncio.run(run_agent("What is the token balance of address 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266?"))
-    #asyncio.run(run_agent("Please send 10 Token to address 0x70997970C51812dc3A010C7d01b50e0d17dc79C8"))
+    #asyncio.run(run_agent("Wie hoch ist der Token Saldo der Adresse 0xdd2fd4581271e230360230f9337d5c0430bf44c0?"))
