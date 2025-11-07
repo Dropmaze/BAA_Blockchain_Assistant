@@ -27,7 +27,7 @@ def parse_address_list(env_value: str | None) -> Set[str]:
 
 # --- Configuration ---
 NETWORK_RPC_URL = os.getenv("NETWORK_RPC_URL")
-NETWORK_ID = os.getenv("NETWORK_ID")
+NETWORK_ID = int(os.getenv("NETWORK_ID"))
 PRIVATE_KEY = os.getenv("PRIVATE_KEY")
 # Ensure the private key does not have the '0x' prefix for web3.py account loading
 if PRIVATE_KEY and PRIVATE_KEY.startswith('0x'):
@@ -92,7 +92,7 @@ async def web3_lifespan(server: FastMCP) -> AsyncIterator[Web3Context]:
     print("--- Initializing Web3 Connection (Lifespan Start) ---")
     if not NETWORK_RPC_URL:
         print("ERROR: NEWTORK_RPC_URL not found in environment variables.")
-        raise ValueError("NEWTORK_RPC_URL not found in environment variables.")
+        raise ValueError("NETWORK_RPC_URL not found in environment variables.")
     if not NETWORK_ID:
         print("ERROR: NETWORK_ID not found in environment variables.")
         raise ValueError("NETWORK_ID not found in environment variables.")
@@ -232,7 +232,7 @@ async def send_eth(ctx: Context, to_address: str, amount_eth: float) -> str:
 
     checksum_to_address = Web3.to_checksum_address(to_address)
     # Check against ETH whitelist
-    if checksum_to_address not in ETH_WHITELIST:
+    if ETH_WHITELIST and checksum_to_address not in ETH_WHITELIST:
         return f"Error: Recipient address {to_address} is not whitelisted for ETH transfers."
 
     sender_account = w3.eth.account.from_key(PRIVATE_KEY)
@@ -379,8 +379,8 @@ async def send_erc20_token(ctx: Context, to_address: str, amount: float) -> str:
 
     checksum_to_address = Web3.to_checksum_address(to_address)
     # Check against ERC20 whitelist
-    if checksum_to_address not in ERC20_WHITELIST:
-        return f"Error: Recipient address {to_address} is not whitelisted for ERC20 transfers."
+    if ERC20_WHITELIST and checksum_to_address not in ERC20_WHITELIST:
+            return f"Error: Recipient address {to_address} is not whitelisted for ERC20 transfers."
 
     sender_account = w3.eth.account.from_key(PRIVATE_KEY) # Need account object to sign
 

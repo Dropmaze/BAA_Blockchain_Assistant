@@ -22,7 +22,7 @@ async def run_agent(message: str) -> None:
                 tools=[mcp_tools],
                 instructions=dedent("""\
                     Du bist ein Ethereum-Agent. Antworte ausschließlich auf Deutsch.
-                    Verwende klare, knappe Formulierungen und bleibe technisch präzise.
+                    Verwende klare Formulierungen und gib nur Rückmeldung auf die Frage.
                 """),
                 markdown=True,
                 debug_mode=True,
@@ -37,5 +37,5 @@ async def run_agent(message: str) -> None:
 # Example usage
 if __name__ == "__main__":
     # Basic example - exploring project license
-    asyncio.run(run_agent("Wie hoch ist der Token Saldo der Adresse 0xdd2fd4581271e230360230f9337d5c0430bf44c0?"))
+    asyncio.run(run_agent("Wie viel VLZ besitzt die Adresse 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266?"))
 
