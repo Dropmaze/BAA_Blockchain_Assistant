@@ -352,7 +352,7 @@ async def send_erc20_token(ctx: Context, to_address: str, amount: float) -> str:
     Args:
         ctx: The MCP server context.
         to_address: The recipient Ethereum address.
-        amount: The amount of tokens to send (e.g., 0.5).
+        amount: The amount of tokens to send
 
     Returns:
         A string indicating the transaction hash on success, or an error message.
