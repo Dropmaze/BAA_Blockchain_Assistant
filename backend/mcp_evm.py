@@ -1,31 +1,27 @@
-# mcp_evm.py
 import asyncio
 import os
 import sys
 import re
 from textwrap import dedent
-
 from agno.agent import Agent
 from agno.models.ollama import Ollama
 from agno.tools.mcp import MCPTools
 from agno.tools import tool
 from agno.utils import pprint as agno_pprint
-
-# MCP client (direct invocation)
 from mcp.client.stdio import stdio_client, StdioServerParameters
 from mcp.client.session import ClientSession
 
-# Fix for Windows asyncio event loop
+#Fix for Windows asyncio event loop
 if sys.platform.startswith("win"):
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-# Directory + path for server.py
+#Determine directory & path to server.py
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SERVER_PATH = os.path.join(ROOT, "server.py")
 
 
 # ======================================
-#   MCP Tool Call via STDIO Client
+# MCP Tool Call via STDIO Client
 # ======================================
 
 async def call_mcp_tool(tool_name: str, **kwargs) -> str:
@@ -53,18 +49,18 @@ async def call_mcp_tool(tool_name: str, **kwargs) -> str:
 
 
 # ======================================
-#   Wrapper Tools (Human-in-the-Loop)
+# Wrapper Tools (Human-in-the-Loop)
 # ======================================
 
 @tool(requires_confirmation=True)
 async def send_eth_hitl(to_address: str, amount_eth: float) -> str:
-    """Wrapper tool to send ETH — requires manual confirmation."""
+    """Wrapper tool to send ETH, requires manual confirmation."""
     return await call_mcp_tool("send_eth", to_address=to_address, amount_eth=amount_eth)
 
 
 @tool(requires_confirmation=True)
 async def send_erc20_hitl(token_address: str, to_address: str, amount: float) -> str:
-    """Wrapper tool to send ERC20 tokens — requires manual confirmation."""
+    """Wrapper tool to send ERC20 tokens, requires manual confirmation."""
     return await call_mcp_tool(
         "send_erc20_token",
         token_address=token_address,
@@ -74,7 +70,7 @@ async def send_erc20_hitl(token_address: str, to_address: str, amount: float) ->
 
 
 # ======================================
-#   Helper Functions
+#Helper Functions
 # ======================================
 
 def _extract_text(rr) -> str | None:
@@ -108,7 +104,7 @@ def _extract_text(rr) -> str | None:
     return None
 
 
-# Regex pattern for transaction hash detection
+#Regex pattern for transaction hash detection
 _TX_HASH_RE = re.compile(r"\b(0x)?[A-Fa-f0-9]{64}\b")
 
 def _normalize_tx_text(text: str) -> str:
@@ -121,13 +117,62 @@ def _normalize_tx_text(text: str) -> str:
     normalized = (
         "\nTransaktion erfolgreich übermittelt\n"
         "-----------------------------------\n"
-        f"Hash: {tx_hash}\n"
-    )
+        f"Hash: {tx_hash}\n")
     return normalized
 
 
 # ======================================
-#   Agent Execution / HITL Flow
+#CLI Confirmation Display
+# ======================================
+
+def _print_rule(title: str) -> None:
+    """Prints a simple section header for CLI output."""
+    line = "─" * max(10, len(title) + 2)
+    print("\n" + line)
+    print(title)
+    print(line)
+
+def _confirm_tool_cli(tool) -> bool:
+    """Renders a readable confirmation block for the given tool and asks the user to confirm."""
+    name = getattr(tool, "tool_name", "")
+    args = getattr(tool, "tool_args", {}) or {}
+
+    if name == "send_eth_hitl":
+        amount = args.get("amount_eth")
+        to_addr = args.get("to_address")
+
+        _print_rule("Bestätigung erforderlich")
+        print("Aktion: ETH senden")
+        print(f"Betrag: {amount} ETH")
+        print(f"Empfängeradresse: {to_addr}")
+
+    elif name == "send_erc20_hitl":
+        amount = args.get("amount")
+        token_addr = args.get("token_address")
+        to_addr = args.get("to_address")
+
+        _print_rule("Bestätigung erforderlich")
+        print("Aktion: ERC-20 Token senden")
+        print(f"Betrag: {amount}")
+        print(f"Token-Adresse: {token_addr}")
+        print(f"Empfängeradresse: {to_addr}")
+
+    else:
+        # Fallback for unknown tools: show raw name/args
+        _print_rule("Bestätigung erforderlich")
+        print(f"Aktion: {name}")
+        print(f"Argumente: {args}")
+
+    # Ask for confirmation
+    while True:
+        ans = input("\nMöchtest du diese Aktion ausführen? (y/n): ").strip().lower()
+        if ans in ("y", "n"):
+            return ans == "y"
+        print("Bitte 'y' oder 'n' eingeben um die Aktion auszuführen oder abzubrechen.")
+
+
+# ======================================
+#Agent Execution / HITL Flow
 # ======================================
 
 async def run_agent(message: str) -> None:
@@ -140,13 +185,12 @@ async def run_agent(message: str) -> None:
                 instructions=dedent("""\
                     Du bist ein Ethereum-Agent. Antworte ausschliesslich auf Deutsch.
                     - Verwende MCP-Tools für Blockchain-Operationen.
-                    - Für `send_eth_hitl` und `send_erc20_hitl` ist IMMER eine Bestätigung nötig.
-                    - Wenn eine Transaktion erfolgreich ausgeführt wurde, 
-                      gib nur eine klare, kurze Bestätigung mit Hash aus.
+                    - Für "send_eth_hitl" und "send_erc20_hitl" ist IMMER eine Bestätigung nötig.
+                    - Wenn eine Transaktion erfolgreich ausgeführt wurde, gib nur eine klare, kurze Bestätigung mit Hash aus.
                     - Fordere danach keine weitere Bestätigung an.
                 """),
                 markdown=True,
-                #debug_mode=True,
+                debug_mode=True,
             )
 
             run_response = await agent.arun(message)
@@ -155,21 +199,14 @@ async def run_agent(message: str) -> None:
             while getattr(run_response, "is_paused", False):
                 tools_conf = getattr(run_response, "tools_requiring_confirmation", []) or []
                 if not tools_conf:
-                    print("\nLauf ist pausiert, aber keine Tools zur Bestätigung vorhanden.\n")
+                    print("\nLauf ist pausiert! Keine Tools zur Bestätigung vorhanden.\n")
                     break
 
-                print("\nBestätigung erforderlich:\n")
-                for i, t in enumerate(tools_conf, start=1):
-                    print(f"{i}. {t.tool_name} mit Argumenten: {t.tool_args}")
-
+                # Friendly, readable CLI confirmation
                 for t in tools_conf:
-                    while True:
-                        ans = input(f"Ausführen von {t.tool_name}? (y/n): ").strip().lower()
-                        if ans in ("y", "n"):
-                            t.confirmed = (ans == "y")
-                            break
-                        print("Bitte 'y' oder 'n' eingeben.\n")
+                    t.confirmed = _confirm_tool_cli(t)
 
+                # Continue after gathering all confirmations
                 run_response = await agent.acontinue_run(run_response=run_response)
 
             # Display final output
@@ -177,25 +214,27 @@ async def run_agent(message: str) -> None:
             if text:
                 print("\n" + _normalize_tx_text(text) + "\n")
             else:
-                print("\nKeine lesbare Ausgabe – zeige Response-Details:\n")
+                print("\nKeine lesbare Ausgabe, zeige Response-Details:\n")
                 agno_pprint.pprint_run_response(run_response)
 
     except Exception as e:
         print(f"\nFehler beim Ausführen des Agenten: {e}\n")
 
 
+
 # ======================================
-#   CLI Loop
+#CLI Loop
 # ======================================
 
 if __name__ == "__main__":
     print("\n")
-    print("------------------------------------")
-    print("********** Ethereum Agent **********")
-    print("------------------------------------")
-    print("\n")
+    print("----------------------------------------------------------")
+    print("************* E T H E R E U M - A G E N T ****************")
+    print("----------------------------------------------------------")
+    print("Sensible Aktionen werden erst nach manueller Zustimmung ausgeführt.")
     print("Tippe 'exit' oder 'quit' zum Beenden.\n")
     print("\n")
+
     try:
         while True:
             user_text = input("Eingabe: ").strip()
@@ -206,4 +245,4 @@ if __name__ == "__main__":
                 continue
             asyncio.run(run_agent(user_text))
     except (KeyboardInterrupt, EOFError):
-        print("\nProgramm beendet\n")
+        print("\nProgramm beendet.\n")
