@@ -22,6 +22,9 @@ if sys.platform.startswith("win"):
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SERVER_PATH = os.path.join(ROOT, "server.py")
 
+#???
+COINGECKO_MCP_CMD = 'npx mcp-remote https://mcp.api.coingecko.com/mcp'
+
 #Initialize a Knowledge Base
 knowledge = Knowledge(
     name="baa_knowledge",
@@ -198,16 +201,17 @@ def _confirm_tool_cli(tool) -> bool:
 async def run_agent(message: str) -> None:
     """Runs the agent, handles HITL pauses and user confirmations."""
     try:
-        async with MCPTools(f'python "{SERVER_PATH}"') as mcp_tools:
+        async with MCPTools(f'python "{SERVER_PATH}"') as blockchain_tools, MCPTools(COINGECKO_MCP_CMD) as coingecko_tools:
             agent = Agent(
                 model=Ollama(id="qwen2.5:7b"),
-                tools=[mcp_tools, send_eth_hitl, send_erc20_hitl],
+                tools=[blockchain_tools, coingecko_tools, send_eth_hitl, send_erc20_hitl],
                 knowledge=knowledge,
                 search_knowledge=True,
                 instructions=dedent("""\
                     Du bist ein Ethereum-Agent. Antworte ausschliesslich auf Deutsch und suche 
                     mittels "search_knowledge_base" nach Informationen sofern du eine Frage erhälst.
                     - Verwende MCP-Tools für Blockchain-Operationen.
+                    - Verwende CoinGecko-MCP-Tools für Kurs- und Marktdaten (z.B. Preis von ETH in CHF).
                     - Für "send_eth_hitl" und "send_erc20_hitl" ist IMMER eine Bestätigung nötig.
                     - Wenn eine Transaktion erfolgreich ausgeführt wurde, gib nur eine klare,
                     kurze Bestätigung mit Hash aus.

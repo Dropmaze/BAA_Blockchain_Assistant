@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from pathlib import Path
 from web3 import Web3
 from web3.exceptions import ContractLogicError
-from web3.contract import Contract # Import Contract type hint
+from web3.contract import Contract
 from typing import Set
 
 # Import FastMCP components
