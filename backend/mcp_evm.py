@@ -5,6 +5,9 @@ import re
 from textwrap import dedent
 from agno.agent import Agent
 from agno.models.ollama import Ollama
+from agno.knowledge.embedder.ollama import OllamaEmbedder
+from agno.knowledge.knowledge import Knowledge
+from agno.vectordb.lancedb import LanceDb
 from agno.tools.mcp import MCPTools
 from agno.tools import tool
 from agno.utils import pprint as agno_pprint
@@ -19,6 +22,23 @@ if sys.platform.startswith("win"):
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SERVER_PATH = os.path.join(ROOT, "server.py")
 
+#Initialize a Knowledge Base
+knowledge = Knowledge(
+    name="baa_knowledge",
+    vector_db=LanceDb(
+        table_name="baa_knowledge",
+        uri="lancedb_data",
+        embedder=OllamaEmbedder(
+            id="all-minilm",
+            dimensions=384,
+        ),
+    ),
+)
+
+#Add all Markdown files from the knowledge directory to the knowledge base
+knowledge.add_content(
+    path="C:/Users/Dylan/Desktop/BAA_Blockchain_Assistant/backend/knowledge"
+)
 
 # ======================================
 # MCP Tool Call via STDIO Client
@@ -180,13 +200,17 @@ async def run_agent(message: str) -> None:
     try:
         async with MCPTools(f'python "{SERVER_PATH}"') as mcp_tools:
             agent = Agent(
-                model=Ollama(id=os.getenv("LLM_MODEL", "qwen2.5:3b")),
+                model=Ollama(id="qwen2.5:7b"),
                 tools=[mcp_tools, send_eth_hitl, send_erc20_hitl],
+                knowledge=knowledge,
+                search_knowledge=True,
                 instructions=dedent("""\
-                    Du bist ein Ethereum-Agent. Antworte ausschliesslich auf Deutsch.
+                    Du bist ein Ethereum-Agent. Antworte ausschliesslich auf Deutsch und suche 
+                    mittels "search_knowledge_base" nach Informationen sofern du eine Frage erhälst.
                     - Verwende MCP-Tools für Blockchain-Operationen.
                     - Für "send_eth_hitl" und "send_erc20_hitl" ist IMMER eine Bestätigung nötig.
-                    - Wenn eine Transaktion erfolgreich ausgeführt wurde, gib nur eine klare, kurze Bestätigung mit Hash aus.
+                    - Wenn eine Transaktion erfolgreich ausgeführt wurde, gib nur eine klare,
+                    kurze Bestätigung mit Hash aus.
                     - Fordere danach keine weitere Bestätigung an.
                 """),
                 markdown=True,
