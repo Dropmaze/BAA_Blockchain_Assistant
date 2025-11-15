@@ -2,6 +2,7 @@ import asyncio
 import os
 import sys
 import re
+import requests
 from textwrap import dedent
 from agno.agent import Agent
 from agno.models.ollama import Ollama
@@ -22,8 +23,12 @@ if sys.platform.startswith("win"):
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SERVER_PATH = os.path.join(ROOT, "server.py")
 
-#???
-COINGECKO_MCP_CMD = 'npx mcp-remote https://mcp.api.coingecko.com/mcp'
+
+
+#URL for Coingecko mcp server
+#COINGECKO_MCP_CMD = 'npx mcp-remote https://mcp.api.coingecko.com/mcp'
+
+
 
 #Initialize a Knowledge Base
 knowledge = Knowledge(
@@ -91,6 +96,41 @@ async def send_erc20_hitl(token_address: str, to_address: str, amount: float) ->
         amount=amount,
     )
 
+@tool
+async def get_eth_price_chf() -> str:
+    """
+    Returns the current ETH price in CHF using the CoinGecko public HTTP API.
+    """
+
+    def _fetch():
+        # CoinGecko simple price endpoint
+        url = "https://api.coingecko.com/api/v3/simple/price"
+        params = {"ids": "ethereum", "vs_currencies": "chf"}
+
+        try:
+            # Perform HTTP request (blocking)
+            resp = requests.get(url, params=params, timeout=10)
+            resp.raise_for_status()
+
+            # Parse JSON data
+            data = resp.json()
+            price = data.get("ethereum", {}).get("chf")
+
+            # Validate expected structure
+            if price is None:
+                return "Der ETH-Preis konnte nicht von der CoinGecko API gelesen werden."
+
+            return f"Der aktuelle ETH-Preis beträgt CHF {price}."
+
+        except requests.exceptions.Timeout:
+            return "Die Anfrage an CoinGecko hat zu lange gedauert. Bitte versuche es später erneut."
+        except requests.exceptions.RequestException as e:
+            return f"Beim Abrufen des ETH-Preises von CoinGecko ist ein Fehler aufgetreten: {e}"
+        except Exception:
+            return "Es ist ein unbekannter Fehler beim Abrufen des ETH-Preises aufgetreten."
+
+    # Run blocking HTTP call in a thread worker to avoid blocking the event loop
+    return await asyncio.to_thread(_fetch)
 
 # ======================================
 #Helper Functions
@@ -201,17 +241,17 @@ def _confirm_tool_cli(tool) -> bool:
 async def run_agent(message: str) -> None:
     """Runs the agent, handles HITL pauses and user confirmations."""
     try:
-        async with MCPTools(f'python "{SERVER_PATH}"') as blockchain_tools, MCPTools(COINGECKO_MCP_CMD) as coingecko_tools:
+        async with MCPTools(f'python "{SERVER_PATH}"') as blockchain_tools:
             agent = Agent(
                 model=Ollama(id="qwen2.5:7b"),
-                tools=[blockchain_tools, coingecko_tools, send_eth_hitl, send_erc20_hitl],
+                tools=[blockchain_tools, send_eth_hitl, send_erc20_hitl, get_eth_price_chf],
                 knowledge=knowledge,
                 search_knowledge=True,
                 instructions=dedent("""\
                     Du bist ein Ethereum-Agent. Antworte ausschliesslich auf Deutsch und suche 
                     mittels "search_knowledge_base" nach Informationen sofern du eine Frage erhälst.
                     - Verwende MCP-Tools für Blockchain-Operationen.
-                    - Verwende CoinGecko-MCP-Tools für Kurs- und Marktdaten (z.B. Preis von ETH in CHF).
+                    - Verwende die CoinGecko HTTP-API für Kurs- und Marktdaten (z.B. Preis von ETH in CHF).
                     - Für "send_eth_hitl" und "send_erc20_hitl" ist IMMER eine Bestätigung nötig.
                     - Wenn eine Transaktion erfolgreich ausgeführt wurde, gib nur eine klare,
                     kurze Bestätigung mit Hash aus.
