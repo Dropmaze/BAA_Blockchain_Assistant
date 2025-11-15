@@ -77,7 +77,7 @@ async def call_mcp_tool(tool_name: str, **kwargs) -> str:
 
 
 # ======================================
-# Wrapper Tools (Human-in-the-Loop)
+# Wrapper Tools 
 # ======================================
 
 @tool(requires_confirmation=True)
@@ -103,7 +103,7 @@ async def get_eth_price_chf() -> str:
     """
 
     def _fetch():
-        # CoinGecko simple price endpoint
+        # CoinGecko simple price API endpoint
         url = "https://api.coingecko.com/api/v3/simple/price"
         params = {"ids": "ethereum", "vs_currencies": "chf"}
 
