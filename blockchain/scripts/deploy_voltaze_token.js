@@ -1,12 +1,15 @@
 import { network } from "hardhat";
 
-async function main() {
-  const { ethers } = await network.connect();
+const { ethers } = await network.connect({
+  network: "localhost",
+});
 
+async function main() {
   const [deployer] = await ethers.getSigners();
   console.log("Deployer:", deployer.address);
 
   const VoltazeToken = await ethers.getContractFactory("VoltazeToken");
+
   const initialSupply = ethers.parseUnits("1000000", 18);
 
   console.log("Deploying VoltazeToken...");
