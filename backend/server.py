@@ -29,6 +29,9 @@ def parse_address_list(env_value: str | None) -> Set[str]:
 NETWORK_RPC_URL = os.getenv("NETWORK_RPC_URL")
 NETWORK_ID = int(os.getenv("NETWORK_ID"))
 PRIVATE_KEY = os.getenv("PRIVATE_KEY")
+DAO_CONTRACT_ADDRESS = os.getenv("DAO_CONTRACT_ADDRESS")
+DAO_PROPOSAL_COUNT = int(os.getenv("DAO_PROPOSAL_COUNT", "3"))
+
 # Ensure the private key does not have the '0x' prefix for web3.py account loading
 if PRIVATE_KEY and PRIVATE_KEY.startswith('0x'):
     PRIVATE_KEY = PRIVATE_KEY[2:]
@@ -69,6 +72,90 @@ ERC20_ABI = json.loads("""
 ]
 """)
 
+# Dao Ballot Contract ABI
+DAO_ABI = json.loads("""
+[
+    {
+        "inputs": [
+            { "internalType": "bytes32[]", "name": "proposalNames", "type": "bytes32[]" },
+            { "internalType": "uint256", "name": "durationSeconds", "type": "uint256" }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "constructor"
+    },
+    {
+        "inputs": [],
+        "name": "chairperson",
+        "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [{ "internalType": "address", "name": "", "type": "address" }],
+        "name": "voters",
+        "outputs": [
+            { "internalType": "uint256", "name": "weight", "type": "uint256" },
+            { "internalType": "bool", "name": "voted", "type": "bool" },
+            { "internalType": "address", "name": "delegate", "type": "address" },
+            { "internalType": "uint256", "name": "vote", "type": "uint256" }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+        "name": "proposals",
+        "outputs": [
+            { "internalType": "bytes32", "name": "name", "type": "bytes32" },
+            { "internalType": "uint256", "name": "voteCount", "type": "uint256" }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "votingDeadline",
+        "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [{ "internalType": "address", "name": "voter", "type": "address" }],
+        "name": "giveRightToVote",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [{ "internalType": "address", "name": "to", "type": "address" }],
+        "name": "delegate",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [{ "internalType": "uint256", "name": "proposal", "type": "uint256" }],
+        "name": "vote",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "winningProposal",
+        "outputs": [{ "internalType": "uint256", "name": "winningProposal_", "type": "uint256" }],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "winnerName",
+        "outputs": [{ "internalType": "bytes32", "name": "winnerName_", "type": "bytes32" }],
+        "stateMutability": "view",
+        "type": "function"
+    }
+]
+""")
 
 
 # --- Web3 Context ---
@@ -79,6 +166,7 @@ class Web3Context:
     sender_address: str | None = None
     token_contract: Contract | None = None # Use Contract type hint
     token_decimals: int | None = None
+    dao_contract: Contract | None = None
 
 # --- Lifespan Management ---
 @asynccontextmanager
@@ -91,7 +179,7 @@ async def web3_lifespan(server: FastMCP) -> AsyncIterator[Web3Context]:
     """
     print("--- Initializing Web3 Connection (Lifespan Start) ---")
     if not NETWORK_RPC_URL:
-        print("ERROR: NEWTORK_RPC_URL not found in environment variables.")
+        print("ERROR: NETWORK_RPC_URL not found in environment variables.")
         raise ValueError("NETWORK_RPC_URL not found in environment variables.")
     if not NETWORK_ID:
         print("ERROR: NETWORK_ID not found in environment variables.")
@@ -103,6 +191,7 @@ async def web3_lifespan(server: FastMCP) -> AsyncIterator[Web3Context]:
     w3_instance = None
     sender_addr = None
     token_contract_instance = None
+    dao_contract_instance = None
 
     try:
         print(f"Connecting to Network via: {NETWORK_RPC_URL}")
@@ -140,12 +229,25 @@ async def web3_lifespan(server: FastMCP) -> AsyncIterator[Web3Context]:
         else:
             print("Warning: ERC20_TOKEN_ADDRESS not set. Token functions may fail.")
 
+        # Load Dao Contract
+        if DAO_CONTRACT_ADDRESS:
+            if not Web3.is_address(DAO_CONTRACT_ADDRESS):
+                raise ValueError(f"Invalid DAO_CONTRACT_ADDRESS: {DAO_CONTRACT_ADDRESS}")
+            print(f"Loading DaoBallot contract at: {DAO_CONTRACT_ADDRESS}")
+            dao_contract_instance = w3_instance.eth.contract(
+                address=Web3.to_checksum_address(DAO_CONTRACT_ADDRESS),
+                abi=DAO_ABI,
+            )
+        else:
+            print("Warning: DAO_CONTRACT_ADDRESS not set. DAO tools will not work.")
+
         # Create and yield the context object
         context = Web3Context(
             w3=w3_instance,
             sender_address=sender_addr,
             token_contract=token_contract_instance,
-            token_decimals=token_decimals
+            token_decimals=token_decimals,
+            dao_contract=dao_contract_instance
         )
         yield context
 
