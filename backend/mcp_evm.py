@@ -43,7 +43,7 @@ knowledge = Knowledge(
     ),
 )
 
-#Add all Markdown files from the knowledge directory to the knowledge base
+#Add all files from the knowledge directory to the knowledge base
 knowledge.add_content(
     path="C:/Users/Dylan/Desktop/BAA_Blockchain_Assistant/backend/knowledge"
 )
@@ -241,20 +241,21 @@ def _confirm_tool_cli(tool) -> bool:
 async def run_agent(message: str) -> None:
     """Runs the agent, handles HITL pauses and user confirmations."""
     try:
-        async with MCPTools(f'python "{SERVER_PATH}"') as blockchain_tools:
+        async with MCPTools(f'python "{SERVER_PATH}"') as mcp_tools:
             agent = Agent(
                 model=Ollama(id="qwen2.5:7b"),
-                tools=[blockchain_tools, send_eth_hitl, send_erc20_hitl, get_eth_price_chf],
+                tools=[mcp_tools, send_eth_hitl, send_erc20_hitl, get_eth_price_chf],
                 knowledge=knowledge,
                 search_knowledge=True,
                 instructions=dedent("""\
                     Du bist ein Ethereum-Agent. Antworte ausschliesslich auf Deutsch und suche 
-                    mittels "search_knowledge_base" nach Informationen sofern du eine Frage erhälst.
-                    - Verwende MCP-Tools für Blockchain-Operationen.
+                    mittels "search_knowledge_base" nach Informationen sofern du eine Frage erhälst und dazu keine passendes Tool findest.
+                    - Verwende MCP-Tools für Blockchain-Operatione.
                     - Verwende die CoinGecko HTTP-API für Kurs- und Marktdaten (z.B. Preis von ETH in CHF).
                     - Für "send_eth_hitl" und "send_erc20_hitl" ist IMMER eine Bestätigung nötig.
-                    - Wenn eine Transaktion erfolgreich ausgeführt wurde, gib nur eine klare,
-                    kurze Bestätigung mit Hash aus.
+                    - Wenn eine Transaktion erfolgreich ausgeführt wurde, gib nur eine klare, kurze Bestätigung mit Hash aus.
+                    - Wenn Nutzer*innen abstimmen möchte oder eine Abstimmung erwähnt, dann verwende NICHT search_knowledge_base.
+                    Nutze stattdessen IMMER folgende DAO-Tools: "dao_find_proposal_by_name" und "_dao_vote".
                     - Fordere danach keine weitere Bestätigung an.
                 """),
                 markdown=True,
@@ -263,7 +264,7 @@ async def run_agent(message: str) -> None:
 
             run_response = await agent.arun(message)
 
-            # Handle Human-in-the-Loop (confirmation) pauses
+            # Handle HITL (confirmation) pauses
             while getattr(run_response, "is_paused", False):
                 tools_conf = getattr(run_response, "tools_requiring_confirmation", []) or []
                 if not tools_conf:

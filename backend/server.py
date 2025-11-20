@@ -77,7 +77,7 @@ DAO_ABI = json.loads("""
 [
     {
         "inputs": [
-            { "internalType": "bytes32[]", "name": "proposalNames", "type": "bytes32[]" },
+            { "internalType": "string[]", "name": "proposalNames", "type": "string[]" },
             { "internalType": "uint256", "name": "durationSeconds", "type": "uint256" }
         ],
         "stateMutability": "nonpayable",
@@ -106,7 +106,7 @@ DAO_ABI = json.loads("""
         "inputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
         "name": "proposals",
         "outputs": [
-            { "internalType": "bytes32", "name": "name", "type": "bytes32" },
+            { "internalType": "string", "name": "name", "type": "string" },
             { "internalType": "uint256", "name": "voteCount", "type": "uint256" }
         ],
         "stateMutability": "view",
@@ -150,7 +150,7 @@ DAO_ABI = json.loads("""
     {
         "inputs": [],
         "name": "winnerName",
-        "outputs": [{ "internalType": "bytes32", "name": "winnerName_", "type": "bytes32" }],
+        "outputs": [{ "internalType": "string", "name": "winnerName_", "type": "string" }],
         "stateMutability": "view",
         "type": "function"
     }
@@ -269,7 +269,7 @@ mcp = FastMCP(
 )
 
 
-# --- MCP Tools ---
+#---MCP Tools for native ETH and ERC20 Smart Contracs---
 
 @mcp.tool()
 async def get_eth_balance(ctx: Context, address: str) -> str:
@@ -570,6 +570,146 @@ async def send_erc20_token(ctx: Context, to_address: str, amount: float) -> str:
         import traceback
         traceback.print_exc()
         return f"Unexpected Error: {e}"
+
+
+#---MCP Tools for Dao Contract---
+
+@mcp.tool()
+async def dao_list_proposals(ctx: Context) -> str:
+    """
+    Listet alle aktuellen Abstimmungsthemen (Proposals) und deren Stimmen.
+    """
+    web3_ctx = ctx.request_context.lifespan_context
+    w3 = web3_ctx.w3
+    dao_contract = web3_ctx.dao_contract
+
+    if not w3 or not w3.is_connected():
+        return "Error: Web3 is not connected."
+    if not dao_contract:
+        return "Error: DAO contract not configured or loaded."
+
+    lines = ["Aktuell laufende Abstimmungen:\n"]
+    for i in range(DAO_PROPOSAL_COUNT):
+        try:
+            name, vote_count = dao_contract.functions.proposals(i).call()
+            lines.append(
+                f"- {name} – aktuell {vote_count} Stimme(n), die diese Vorlage unterstützen."
+            )
+        except Exception as e:
+            lines.append(f"- Index {i}: Fehler beim Laden: {e}")
+
+    return "\n".join(lines)
+
+
+@mcp.tool()
+async def dao_get_winner(ctx: Context) -> str:
+    """
+    Gibt den aktuell führenden Proposal (Gewinner) zurück.
+    """
+    web3_ctx = ctx.request_context.lifespan_context
+    w3 = web3_ctx.w3
+    dao_contract = web3_ctx.dao_contract
+
+    if not w3 or not w3.is_connected():
+        return "Error: Web3 is not connected."
+    if not dao_contract:
+        return "Error: DAO contract not configured or loaded."
+
+    try:
+        winning_index = dao_contract.functions.winningProposal().call()
+        winner_name = dao_contract.functions.winnerName().call()
+        return f"Aktueller Gewinner ist Proposal {winning_index}: \"{winner_name}\""
+    except Exception as e:
+        return f"Error getting winner: {e}"
+    
+
+@mcp.tool()
+async def dao_vote(ctx: Context, proposal_index: int) -> str:
+    """
+    Votes for a proposal in the DaoBallot contract.
+    """
+    web3_ctx = ctx.request_context.lifespan_context
+    w3 = web3_ctx.w3
+    dao_contract = web3_ctx.dao_contract
+    sender_address = web3_ctx.sender_address
+
+    if not w3 or not w3.is_connected():
+        return "Error: Web3 is not connected."
+    if not dao_contract:
+        return "Error: DAO contract not configured or loaded."
+    if not sender_address:
+        return "Error: Sender address not configured."
+    if not PRIVATE_KEY:
+        return "Error: Private key not configured."
+    if proposal_index < 0 or proposal_index >= DAO_PROPOSAL_COUNT:
+        return f"Error: Ungültiger Proposal-Index {proposal_index}. Erlaubt: 0..{DAO_PROPOSAL_COUNT - 1}"
+
+    try:
+        account = w3.eth.account.from_key(PRIVATE_KEY)
+        nonce = w3.eth.get_transaction_count(sender_address)
+        gas_price = w3.eth.gas_price
+
+        # Gas schätzen
+        gas_estimate = dao_contract.functions.vote(proposal_index).estimate_gas(
+            {"from": sender_address}
+        )
+        gas_limit = int(gas_estimate * 1.2)
+
+        tx = dao_contract.functions.vote(proposal_index).build_transaction(
+            {
+                "chainId": int(NETWORK_ID),
+                "from": sender_address,
+                "nonce": nonce,
+                "gasPrice": gas_price,
+                "gas": gas_limit,
+            }
+        )
+
+        signed_tx = account.sign_transaction(tx)
+        tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+        tx_hash_hex = tx_hash.hex()
+
+        print(f"DAO vote tx sent: {tx_hash_hex}")
+        return f"DAO-Stimme abgegeben. Transaktions-Hash: {tx_hash_hex}"
+
+    except ContractLogicError as cle:
+        msg = f"Contract logic error while voting: {cle}"
+        print(msg)
+        return f"Error: {msg}"
+    except Exception as e:
+        msg = f"Error sending DAO vote transaction: {e}"
+        print(msg)
+        return f"Error: {msg}"
+
+@mcp.tool()
+async def dao_find_proposal_by_name(ctx: Context, query: str) -> str:
+    """
+    Searches for a proposal based on a keyword or substring and returns matching hits.
+    """
+    web3_ctx = ctx.request_context.lifespan_context
+    w3 = web3_ctx.w3
+    dao_contract = web3_ctx.dao_contract
+
+    if not w3 or not w3.is_connected():
+        return "Error: Web3 is not connected."
+    if not dao_contract:
+        return "Error: DAO contract not configured or loaded."
+
+    q = query.strip().lower()
+    matches = []
+
+    for i in range(DAO_PROPOSAL_COUNT):
+        try:
+            name, _ = dao_contract.functions.proposals(i).call()
+            if q in name.lower():
+                matches.append(f"{i}:{name}")
+        except Exception as e:
+            continue
+
+    if not matches:
+        return f"No match found for search term: '{query}'"
+
+    return "\n".join(matches)
 
 
 # --- Main Execution Logic ---

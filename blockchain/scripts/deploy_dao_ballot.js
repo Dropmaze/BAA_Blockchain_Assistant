@@ -1,22 +1,21 @@
 import { network } from "hardhat";
 
 const { ethers } = await network.connect({
-  network: "localhost", // oder "hardhatMainnet"
+  network: "localhost",
 });
 
 async function main() {
-  const proposals = ["Proposal 1", "Proposal 2", "Proposal 3"];
-
-  const proposalBytes = proposals.map((name) =>
-    ethers.encodeBytes32String(name)
-  );
+  const proposals = [
+    "Soll ein neues offizielles Logo eingeführt werden?",
+    "Soll ein jährliches gemeinsames Team-Event organisiert werden?"
+  ];
 
   const durationSeconds = 60 * 60 * 24;
 
   console.log("Deploying DaoBallot contract...");
 
   const DaoBallot = await ethers.getContractFactory("DaoBallot");
-  const daoBallot = await DaoBallot.deploy(proposalBytes, durationSeconds);
+  const daoBallot = await DaoBallot.deploy(proposals, durationSeconds);
 
   await daoBallot.waitForDeployment();
 
@@ -32,5 +31,5 @@ async function main() {
 
 main().catch((error) => {
   console.error(error);
-  process.exitCode = 1;
+  process.exit(1);
 });

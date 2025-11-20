@@ -16,8 +16,8 @@ contract DaoBallot {
     }
 
     struct Proposal {
-        bytes32 name;        // short name (up to 32 bytes)
-        uint256 voteCount;   // accumulated votes
+        string name;
+        uint256 voteCount;
     }
 
     address public chairperson;
@@ -32,19 +32,16 @@ contract DaoBallot {
      * @param proposalNames Names of proposals
      * @param durationSeconds Voting duration in seconds starting from deployment time
      */
-    constructor(bytes32[] memory proposalNames, uint256 durationSeconds) {
+    constructor(string[] memory proposalNames, uint256 durationSeconds) {
         chairperson = msg.sender;
         voters[chairperson].weight = 1;
-
         votingDeadline = block.timestamp + durationSeconds;
 
         for (uint256 i = 0; i < proposalNames.length; i++) {
-            proposals.push(
-                Proposal({
-                    name: proposalNames[i],
-                    voteCount: 0
-                })
-            );
+            proposals.push(Proposal({
+                name: proposalNames[i],
+                voteCount: 0
+            }));
         }
     }
 
@@ -138,7 +135,7 @@ contract DaoBallot {
     function winnerName()
         external
         view
-        returns (bytes32 winnerName_)
+        returns (string memory winnerName_)
     {
         winnerName_ = proposals[winningProposal()].name;
     }
