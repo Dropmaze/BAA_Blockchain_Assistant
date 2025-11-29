@@ -42,7 +42,7 @@ async def run_agent(message: str) -> None:
         
         #Ethereum Agent
         eth_agent = Agent(
-            model=Ollama(id="llama3.2:latest"),
+            model=Ollama(id="qwen3:8b"),
             tools=[mcp_tools],
             instructions=dedent("""
                 Du bist der Ethereum-Agent. Deine Aufgaben:
@@ -52,12 +52,12 @@ async def run_agent(message: str) -> None:
                 - Du interpretierst keine menschlichen Namen. Namen sind Aufgabe des Adressbuch-Agenten.
             """),
             markdown=True,
-            #debug_mode=True,
+            debug_mode=True,
         )
 
         #Adress Book Agent
         address_book_agent = Agent(
-            model=Ollama(id="llama3.2:latest"),
+            model=Ollama(id="qwen3:8b"),
             tools=[get_address_by_name],
             instructions=dedent("""
                 Du bist der Adressbuch-Agent. Deine einzige Aufgabe ist es, menschliche Namen in Ethereum-Adressen umzuwandeln.
@@ -68,29 +68,38 @@ async def run_agent(message: str) -> None:
                 - Führe keine Blockchain-Abfragen oder Analysen durch.
             """),
             markdown=True,
-            #debug_mode=True,
+            debug_mode=True,
         )
 
         #Agent Team    
         team = Team(
             name="Ethereum_Assistant_Team",
             members=[address_book_agent, eth_agent],
-            model=Ollama(id="llama3.2:latest"),
-            instructions=dedent("""
+            model=Ollama(id="qwen3:8b"),
+            instructions = dedent("""
                 Ihr arbeitet gemeinsam an Nutzeranfragen.
+
                 Rollenverteilung:
                 - Der Adressbuch-Agent wandelt Namen in Ethereum-Adressen um, indem er das Tool `get_address_by_name` nutzt.
-                - Der Ethereum-Agent verarbeitet ausschließlich Adressen und führt darauf basierende Blockchain-Abfragen aus.
+                - Der Ethereum-Agent verarbeitet ausschließlich Ethereum-Adressen (0x...) und führt darauf basierende Blockchain-Abfragen aus.
+
                 Arbeitsablauf:
                 1. Wenn der Nutzer einen Namen nennt, soll der Adressbuch-Agent zuerst die Adresse liefern.
-                2. Wenn der Nutzer ausdrücklich nach Blockchain-Daten fragt (z. B. Guthaben, Transaktionen,
-                Gas oder Saldo), soll der Ethereum-Agent übernehmen.
-                3. Wenn der Nutzer NICHT nach Blockchain-Daten fragt, sondern NUR nach der Adresse,
-                darf KEIN weiterer Agent aktiviert werden. Die Antwort des Adressbuch-Agenten ist dann die Endantwort.
+                2. Sobald eine konkrete Ethereum-Adresse vorliegt und der Nutzer eine Aktion wie Überweisung,
+                Saldo-Abfrage oder Transaktion verlangt, soll der Ethereum-Agent übernehmen.
+                3. Wenn der Nutzer nur nach einer Adresse fragt, darf KEIN weiterer Agent aktiviert werden.
+                Die Antwort des Adressbuch-Agenten ist dann die Endantwort.
                 4. Der Team-Leiter darf keine Tools oder Agenten ohne ausdrückliche Nutzeranforderung aktivieren.
+
+                Zusätzliche Regeln:
+                - Weder der Team-Leiter noch einer der Agenten dürfen externe Links oder URLs erzeugen
+                (z. B. Etherscan, Basescan, Explorer).
+                - Bei Transaktionen soll der Ethereum-Agent stets eine kurze, laiengerechte Erklärung geben,
+                wie der Vorgang abgelaufen ist (z. B. „Der Auftrag wurde vom System angenommen, verarbeitet
+                und bestätigt.“), gefolgt vom rohen Transaktionshash in Backticks.
             """),
             markdown=True,
-            #debug_mode=True,
+            debug_mode=True,
         )
 
 
@@ -102,5 +111,9 @@ async def run_agent(message: str) -> None:
 #=============================
 if __name__ == "__main__":
     #asyncio.run(run_agent("Was ist das Guthaben auf der Adresse 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266?"))
-    asyncio.run(run_agent("Wie lautet die Adresse von Samira?"))
-    #asyncio.run(run_agent("Welche Tools stehen dir alle zur Verfügung?"))
+    #asyncio.run(run_agent("Bitte sende 100 ETH an die Adresse 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"))
+    #asyncio.run(run_agent("Bitte überweise 100 VLZ an die Adresse 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"))
+    #asyncio.run(run_agent("Bitte überweise 100 ETH an die Adresse von Joel"))
+    asyncio.run(run_agent("Bitte überweise 100 Voltaze an die Adresse von Patrick"))
+    #asyncio.run(run_agent("Wie lautet die Adresse von Joel?"))
+    #asyncio.run(run_agent("Welche Tools stehen dir alle zur Verfügung?"))ollama
