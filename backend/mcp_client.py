@@ -133,18 +133,26 @@ async def run_agent(message: str) -> None:
         
         #Ethereum Agent
         eth_agent = Agent(
+            name="Ethereum_DAO_Agent",
             model=Ollama(id="qwen2.5:3b"),
             tools=[mcp_tools, send_eth_hitl, send_erc20_hitl],
             instructions=dedent("""
-                Du bist der Ethereum-Agent. Deine Aufgaben:
-                - Du arbeitest ausschließlich mit Ethereum-Adressen (0x...).
-                - Du führst On-Chain-Abfragen, Saldenprüfungen und Analysen durch.
-                - Wenn dir eine gültige Adresse übergeben wird, führst du die passende Blockchain-Abfrage aus.
-                - Du interpretierst keine menschlichen Namen. Namen sind Aufgabe des Adressbuch-Agenten.
-                Wichtige Regel für Transaktionen:
-                - Für ETH-Überweisungen verwende ausschließlich das Tool `send_eth_hitl`.
-                - Für Voltaze/ERC20-Überweisungen verwende ausschließlich das Tool `send_erc20_hitl`.
-                - Verwende NICHT direkt die MCP-Tools `send_eth` oder `send_erc20_token`.
+            Du bist Ethereum- und DAO-Assistent.
+
+            Nutze die Tools aus dem MCP-Server:
+            - Für Abstimmungen, DAO, Proposals, Voting:
+            - dao_list_proposals für "laufende Abstimmungen" / Übersicht
+            - dao_get_winner für den aktuellen Gewinner
+            - dao_vote, wenn der Nutzer eine Stimme abgeben will
+            - Für ETH und Token:
+            - get_eth_balance, get_erc20_token_balance
+            - send_eth_hitl für ETH-Transaktionen
+            - send_erc20_hitl für ERC20-Transaktionen
+
+            Wenn eine Frage nach "Abstimmung", "Proposal", "Vote", "DAO" klingt,
+            verwende IMMER die dao_* Tools.
+
+            Antworte kurz und sachlich und erwähne das genutzte Tool im Text.
             """),
             markdown=True,
             debug_mode=True,
@@ -152,49 +160,20 @@ async def run_agent(message: str) -> None:
 
         #Adress Book Agent
         address_book_agent = Agent(
+            name="Address_Book_Agent",
             model=Ollama(id="qwen2.5:3b"),
             tools=[get_address_by_name],
             instructions=dedent("""
-                Du bist der Adressbuch-Agent. Deine einzige Aufgabe ist es, menschliche Namen in Ethereum-Adressen umzuwandeln.
-                Wenn ein Nutzer einen Namen verwendet:
-                - Nutze ausnahmslos das Tool "get_address_by_name", um die passende Adresse nachzuschlagen.
-                - Gib als Antwort ausschließlich die gefundene Adresse oder eine klare Meldung zurück,
-                  wenn kein Eintrag existiert.
-                - Führe keine Blockchain-Abfragen oder Analysen durch.
-            """),
-            markdown=True,
-            debug_mode=True,
-        )
+            Du bist nur für Adressen-Nachschlagen zuständig.
 
-        #Explain Agent
-        explain_agent = Agent(
-            model=Ollama(id="qwen2.5:3b"),
-            tools=[],
-            instructions=dedent("""
-                Du bist der Erklär Agent für einen Blockchain Assistant.
+            Verwende ausschließlich das Tool get_address_by_name, wenn der Nutzer
+            eine Person mit Namen erwähnt (z.B. "Joel", "Patrick") und nach einer
+            Krypto-Adresse gefragt wird.
 
-                Deine Aufgaben:
-                - Du liest aufmerksam, was der Ethereum-Agent oder andere Agenten zuvor geantwortet haben.
-                - Du fasst die technische Antwort in sehr einfacher, alltagstauglicher Sprache zusammen.
-                - Du erklärst Schritt für Schritt, was passiert (oder passieren würde).
-                - Du vermeidest Fachjargon, wo immer möglich. Wenn Fachbegriffe vorkommen müssen,
-                erklärst du sie kurz in einem Satz.
+            Führe KEINE anderen Aufgaben aus und gehe nicht auf DAO- oder
+            Blockchain-Fragen ein.
 
-                Wichtige Regeln:
-                - Führe NIEMALS selbst Blockchain-Transaktionen aus.
-                - Rufe KEINE Tools auf.
-                - Erfinde keine zusätzlichen Aktionen.
-                - Behaupte NICHT, dass eine Transaktion nur simuliert wurde,
-                außer der Ethereum-Agent hat das **explizit** so geschrieben.
-                - Wenn der Ethereum-Agent ausdrücklich von einer Simulation spricht,
-                stelle klar heraus, dass NICHT wirklich etwas auf der Blockchain ausgeführt wurde.
-                - Am Ende deiner Erklärung zeigst du, falls vorhanden, den Transaktionshash in Backticks,
-                z.B.: `0xabc123...`.
-
-                Stil:
-                - Du schreibst so, dass auch Personen ohne Blockchain-Vorkenntnisse dich verstehen.
-                - Du nutzt kurze Sätze und Beispiele aus dem Alltag (z.B. Kontostand wie beim E-Banking).
-                - Du sprichst die Nutzerin/den Nutzer direkt mit "du" an.
+            Antworte nur mit der gefundenen Adresse oder einer klaren Fehlermeldung.
             """),
             markdown=True,
             debug_mode=True,
@@ -203,34 +182,44 @@ async def run_agent(message: str) -> None:
         #Agent Team
         team = Team(
             name="Ethereum_Assistant_Team",
-            members=[address_book_agent, eth_agent, explain_agent],
+            members=[eth_agent, address_book_agent],
             model=Ollama(id="qwen3:8b"),
-            instructions=dedent("""
-                Ihr arbeitet gemeinsam an Nutzeranfragen.
+    instructions=dedent("""
+    Du koordinierst zwei Agenten mit unterschiedlichen Tools.
 
-                Rollenverteilung:
-                - Der Adressbuch-Agent wandelt Namen in Ethereum-Adressen um, indem er das Tool `get_address_by_name` nutzt.
-                - Der Ethereum-Agent verarbeitet ausschließlich Ethereum-Adressen (0x...) und führt darauf basierende Blockchain-Abfragen aus.
-                - Der Erklär-Agent liest die Antworten des Ethereum-Agenten und übersetzt sie in einfache, laienverständliche Sprache.
+    Routing-Regeln:
+    - Wenn die Nutzerfrage Wörter wie "Abstimmung", "Proposal",
+      "Vote", "DAO", "Gewinner" enthält:
+      → Delegiere an den Agenten, der Tools wie dao_list_proposals,
+        dao_get_winner oder dao_vote besitzt.
+    - Wenn der Nutzer eine Person mit Namen nennt (z.B. "Joel", "Patrick")
+      und eine Adresse braucht:
+      → Delegiere an den Agenten, der das Tool get_address_by_name besitzt.
+    - Wenn der Nutzer eine Transaktion (ETH oder Token) ausführen will:
+      → Zuerst Name via get_address_by_name (falls Name),
+        danach an den Agenten mit send_eth_hitl / send_erc20_hitl.
 
-                Arbeitsablauf:
-                1. Wenn der Nutzer einen Namen nennt, soll der Adressbuch-Agent zuerst die Adresse liefern.
-                2. Sobald eine konkrete Ethereum-Adresse vorliegt und der Nutzer eine Aktion wie Überweisung,
-                   Saldo-Abfrage oder Transaktion verlangt, soll der Ethereum-Agent übernehmen und die passende
-                   On-Chain-Abfrage oder Transaktion durchführen (über MCP-Tools für Abfragen und die HITL-Wrapper für Transfers).
-                3. Wenn der Ethereum-Agent eine technische Antwort oder einen Transaktions-Hash geliefert hat,
-                   soll der Erklär-Agent diese Antwort in einfachen Worten zusammenfassen und als letzte Antwort
-                   an den Nutzer ausgeben.
-                4. Wenn der Nutzer nur nach einer Adresse fragt, darf KEIN weiterer Agent aktiviert werden.
-                   Die Antwort des Adressbuch-Agenten ist dann die Endantwort.
+    Nutze IMMER den Agenten mit den passenden Tools.
 
-                Zusätzliche Regeln:
-                - Weder der Team-Leiter noch einer der Agenten dürfen externe Links oder URLs erzeugen
-                  (z. B. Etherscan, Basescan, Explorer).
-                - Bei Transaktionen soll der Ethereum-Agent wie bisher eine kurze, technische Beschreibung liefern
-                  und den rohen Transaktionshash in Backticks ausgeben.
-                - Der Erklär-Agent ergänzt danach eine leicht verständliche Erklärung für Laien.
-            """),
+    ------------------------------------------------------------
+    LAIENVERSTÄNDLICHE AUSGABEN:
+    ------------------------------------------------------------
+    - Formuliere die endgültige Antwort immer so,
+      dass sie auch für absolute Laien verständlich ist.
+    - Verwende klare, einfache Sprache. Kein Blockchain-Jargon.
+    - Erkläre kurz, was passiert ist (z.B. "Die Zahlung wurde ausgeführt"),
+      aber ohne technische Details wie Gas, Nonce, RPC, Toolnamen usw.
+    - Wenn eine Transaktion ausgeführt wurde:
+        • Erwähne Betrag und Empfänger.
+        • Gib den Transaktions-Hash an.
+        • Erkläre in einem Satz, dass der Hash ein "digitaler Beleg"
+          ist, mit dem man die Zahlung im Blockchain-Explorer prüfen kann.
+    - Bei DAO-Ergebnissen:
+        • Beschreibe kurz, worum es geht ("Abstimmung", "Vorschlag", "aktueller Stand").
+        • Keine internen Variablennamen oder Smart-Contract-Begriffe.
+    - Halte das Ergebnis immer kurz, freundlich und gut verständlich.
+    ------------------------------------------------------------
+    """),
             markdown=True,
             debug_mode=True,
         )
@@ -246,9 +235,9 @@ if __name__ == "__main__":
     #asyncio.run(run_agent("Was ist das Guthaben auf der Adresse 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266?"))
     #asyncio.run(run_agent("Bitte sende 1 ETH an die Adresse 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"))
     #asyncio.run(run_agent("Bitte überweise 1 Voltaze an die Adresse 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"))
-    #asyncio.run(run_agent("Bitte überweise 1 ETH an die Adresse von Joel"))
+    asyncio.run(run_agent("Bitte überweise 0.5 ETH an die Adresse von Joel"))
     #asyncio.run(run_agent("Bitte überweise 1 Voltaze an Patrick"))
-    asyncio.run(run_agent("Wie lautet die Adresse von Joel und wie viel Guthaben ist darauf?"))
-    #asyncio.run(run_agent("Welche Tools stehen dir alle zur Verfügung?"))
+    #asyncio.run(run_agent("Welche Abstimmungen laufen aktuell?"))
+    #asyncio.run(run_agent("Wie lautet die Adresse von Dylan?"))
     #asyncio.run(run_agent("Bitte überweise 1 Voltaze an Patrick"))
     #asyncio.run(run_agent("Bitte überweise 1 Ethereum an Patrick"))
