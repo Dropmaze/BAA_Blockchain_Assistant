@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 from pathlib import Path
 from textwrap import dedent
 from agno.agent import Agent
@@ -7,16 +8,60 @@ from agno.team import Team
 from agno.tools import tool
 from agno.models.ollama import Ollama
 from agno.tools.mcp import MCPTools
+from agno.utils import pprint
+from mcp.client.stdio import stdio_client, StdioServerParameters
+from mcp.client.session import ClientSession
 
 
+# =============================
+# Helper Functions for Tool Calls
+# =============================
 
-#=============================
-#Tools
-#=============================
+ROOT = Path(__file__).parent
+SERVER_PATH = ROOT / "mcp_server.py"
+
+
+async def call_mcp_tool(tool_name: str, **kwargs) -> str:
+    """
+    Ruft ein MCP-Tool im mcp_server.py direkt über den MCP-Client auf
+    und gibt den Text-Output zurück.
+    """
+    params = StdioServerParameters(
+        command="python",
+        args=[str(SERVER_PATH)],
+    )
+
+    async with stdio_client(params) as (read_stream, write_stream):
+        async with ClientSession(read_stream, write_stream) as session:
+            await session.initialize()
+            result = await session.call_tool(tool_name, kwargs)
+
+            texts: list[str] = []
+
+            # Text aus den Content-Items herausziehen
+            for item in result.content:
+                # mcp-types Objekte
+                if hasattr(item, "type") and getattr(item, "type") == "text":
+                    txt = getattr(item, "text", "")
+                    if isinstance(txt, str) and txt.strip():
+                        texts.append(txt)
+                # Fallback, falls dict
+                elif isinstance(item, dict) and item.get("type") == "text":
+                    txt = item.get("text", "")
+                    if isinstance(txt, str) and txt.strip():
+                        texts.append(txt)
+
+            return "\n".join(texts) if texts else ""
+
+
+# =============================
+# Local Tools
+# =============================
+
 @tool(show_result=True, stop_after_tool_call=True)
 def get_address_by_name(name: str) -> str:
     """
-    Liest eine lokale JSON-Datei und gibt die passende Krypto-Adresse zurück. 
+    Liest eine lokale JSON-Datei und gibt die passende Krypto-Adresse zurück.
     Args: name (str): Name der Person.
     """
     address_book_path = Path(__file__).parent / "address_book.json"
@@ -31,10 +76,56 @@ def get_address_by_name(name: str) -> str:
     return f"Die Adresse von {name} lautet {address}."
 
 
+# =============================
+# Wrapper Tools for Confirmation
+# =============================
 
-#=============================
-#Agent Runner
-#=============================
+@tool(name="send_eth_hitl")
+async def send_eth_hitl(to_address: str, amount_eth: float) -> str:
+    """
+    Sicherer Wrapper für MCP-Tool 'send_eth'.
+    Fragt den User direkt im Terminal nach einer Bestätigung.
+    """
+    print("\nAnfrage zum Senden von ETH")
+    print(f"   Empfänger: {to_address}")
+    print(f"   Betrag:    {amount_eth} ETH")
+    answer = input("Willst du diese Transaktion wirklich ausführen? [y/n] ").strip().lower()
+
+    if answer != "y":
+        return "Die ETH-Transaktion wurde vom Nutzer abgebrochen."
+
+    # Wenn bestätigt → MCP-Tool aufrufen
+    return await call_mcp_tool(
+        "send_eth",
+        to_address=to_address,
+        amount_eth=amount_eth,
+    )
+
+@tool(name="send_erc20_hitl")
+async def send_erc20_hitl(to_address: str, amount: float) -> str:
+    """
+    Sicherer Wrapper für MCP-Tool 'send_erc20_token'.
+    Fragt den User direkt im Terminal nach einer Bestätigung.
+    """
+    print("\nAnfrage zum Senden von Voltaze (ERC20)")
+    print(f"   Empfänger: {to_address}")
+    print(f"   Betrag:    {amount} Voltaze")
+    answer = input("Willst du diese Transaktion wirklich ausführen? [y/n] ").strip().lower()
+
+    if answer != "y":
+        return "Die Token-Transaktion wurde vom Nutzer abgebrochen."
+
+    # Wenn bestätigt → MCP-Tool aufrufen
+    return await call_mcp_tool(
+        "send_erc20_token",
+        to_address=to_address,
+        amount=amount,
+    )
+
+# =============================
+# Agent Runner
+# =============================
+
 async def run_agent(message: str) -> None:
     """Führt das Agent-Team aus und verarbeitet eine Nutzeranfrage."""
 
@@ -43,13 +134,17 @@ async def run_agent(message: str) -> None:
         #Ethereum Agent
         eth_agent = Agent(
             model=Ollama(id="qwen2.5:3b"),
-            tools=[mcp_tools],
+            tools=[mcp_tools, send_eth_hitl, send_erc20_hitl],
             instructions=dedent("""
                 Du bist der Ethereum-Agent. Deine Aufgaben:
                 - Du arbeitest ausschließlich mit Ethereum-Adressen (0x...).
                 - Du führst On-Chain-Abfragen, Saldenprüfungen und Analysen durch.
                 - Wenn dir eine gültige Adresse übergeben wird, führst du die passende Blockchain-Abfrage aus.
                 - Du interpretierst keine menschlichen Namen. Namen sind Aufgabe des Adressbuch-Agenten.
+                Wichtige Regel für Transaktionen:
+                - Für ETH-Überweisungen verwende ausschließlich das Tool `send_eth_hitl`.
+                - Für Voltaze/ERC20-Überweisungen verwende ausschließlich das Tool `send_erc20_hitl`.
+                - Verwende NICHT direkt die MCP-Tools `send_eth` oder `send_erc20_token`.
             """),
             markdown=True,
             debug_mode=True,
@@ -71,7 +166,7 @@ async def run_agent(message: str) -> None:
             debug_mode=True,
         )
 
-        # Explain Agent
+        #Explain Agent
         explain_agent = Agent(
             model=Ollama(id="qwen2.5:3b"),
             tools=[],
@@ -83,16 +178,18 @@ async def run_agent(message: str) -> None:
                 - Du fasst die technische Antwort in sehr einfacher, alltagstauglicher Sprache zusammen.
                 - Du erklärst Schritt für Schritt, was passiert (oder passieren würde).
                 - Du vermeidest Fachjargon, wo immer möglich. Wenn Fachbegriffe vorkommen müssen,
-                  erklärst du sie kurz in einem Satz.
+                erklärst du sie kurz in einem Satz.
 
                 Wichtige Regeln:
                 - Führe NIEMALS selbst Blockchain-Transaktionen aus.
                 - Rufe KEINE Tools auf.
-                - Erfinde keine zusätzlichen Aktionen - erkläre nur das, was bereits geplant oder ausgeführt wurde.
-                - Wenn eine Transaktion nur simuliert wurde, stelle ganz klar heraus,
-                  dass NICHT wirklich auf der Blockchain etwas ausgeführt wurde.
+                - Erfinde keine zusätzlichen Aktionen.
+                - Behaupte NICHT, dass eine Transaktion nur simuliert wurde,
+                außer der Ethereum-Agent hat das **explizit** so geschrieben.
+                - Wenn der Ethereum-Agent ausdrücklich von einer Simulation spricht,
+                stelle klar heraus, dass NICHT wirklich etwas auf der Blockchain ausgeführt wurde.
                 - Am Ende deiner Erklärung zeigst du, falls vorhanden, den Transaktionshash in Backticks,
-                  z.B.: `0xabc123...`.
+                z.B.: `0xabc123...`.
 
                 Stil:
                 - Du schreibst so, dass auch Personen ohne Blockchain-Vorkenntnisse dich verstehen.
@@ -103,13 +200,12 @@ async def run_agent(message: str) -> None:
             debug_mode=True,
         )
 
-
-        #Agent Team    
+        #Agent Team
         team = Team(
             name="Ethereum_Assistant_Team",
             members=[address_book_agent, eth_agent, explain_agent],
             model=Ollama(id="qwen3:8b"),
-            instructions = dedent("""
+            instructions=dedent("""
                 Ihr arbeitet gemeinsam an Nutzeranfragen.
 
                 Rollenverteilung:
@@ -121,7 +217,7 @@ async def run_agent(message: str) -> None:
                 1. Wenn der Nutzer einen Namen nennt, soll der Adressbuch-Agent zuerst die Adresse liefern.
                 2. Sobald eine konkrete Ethereum-Adresse vorliegt und der Nutzer eine Aktion wie Überweisung,
                    Saldo-Abfrage oder Transaktion verlangt, soll der Ethereum-Agent übernehmen und die passende
-                   On-Chain-Abfrage oder Transaktion durchführen (über die MCP-Tools).
+                   On-Chain-Abfrage oder Transaktion durchführen (über MCP-Tools für Abfragen und die HITL-Wrapper für Transfers).
                 3. Wenn der Ethereum-Agent eine technische Antwort oder einen Transaktions-Hash geliefert hat,
                    soll der Erklär-Agent diese Antwort in einfachen Worten zusammenfassen und als letzte Antwort
                    an den Nutzer ausgeben.
@@ -139,18 +235,20 @@ async def run_agent(message: str) -> None:
             debug_mode=True,
         )
 
-        await team.aprint_response(message, stream=True)
+        run_response = await team.arun(message)
+        pprint.pprint_run_response(run_response)
 
 
-#=============================
-#Example usage
-#=============================
+# =============================
+# Example usage
+# =============================
 if __name__ == "__main__":
     #asyncio.run(run_agent("Was ist das Guthaben auf der Adresse 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266?"))
-    #asyncio.run(run_agent("Bitte sende 100 ETH an die Adresse 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"))
-    #asyncio.run(run_agent("Bitte überweise 100 VLZ an die Adresse 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"))
-    #asyncio.run(run_agent("Bitte überweise 100 ETH an die Adresse von Joel"))
-    #asyncio.run(run_agent("Bitte überweise 100 Voltaze an Patrick"))
-    #asyncio.run(run_agent("Wie lautet die Adresse von Joel?"))
+    #asyncio.run(run_agent("Bitte sende 1 ETH an die Adresse 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"))
+    #asyncio.run(run_agent("Bitte überweise 1 Voltaze an die Adresse 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"))
+    #asyncio.run(run_agent("Bitte überweise 1 ETH an die Adresse von Joel"))
+    #asyncio.run(run_agent("Bitte überweise 1 Voltaze an Patrick"))
+    asyncio.run(run_agent("Wie lautet die Adresse von Joel und wie viel Guthaben ist darauf?"))
     #asyncio.run(run_agent("Welche Tools stehen dir alle zur Verfügung?"))
-    asyncio.run(run_agent("Was ist der aktuelle Gas Preis und was ist ein Gas Preis überhaupt?"))
+    #asyncio.run(run_agent("Bitte überweise 1 Voltaze an Patrick"))
+    #asyncio.run(run_agent("Bitte überweise 1 Ethereum an Patrick"))
