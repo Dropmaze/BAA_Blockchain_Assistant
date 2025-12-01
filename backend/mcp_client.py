@@ -1,6 +1,8 @@
 import asyncio
 import json
 import os
+import requests
+
 from pathlib import Path
 from textwrap import dedent
 from agno.agent import Agent
@@ -11,6 +13,7 @@ from agno.tools.mcp import MCPTools
 from agno.utils import pprint
 from mcp.client.stdio import stdio_client, StdioServerParameters
 from mcp.client.session import ClientSession
+
 
 
 # =============================
@@ -38,14 +41,13 @@ async def call_mcp_tool(tool_name: str, **kwargs) -> str:
 
             texts: list[str] = []
 
-            # Text aus den Content-Items herausziehen
             for item in result.content:
-                # mcp-types Objekte
+
                 if hasattr(item, "type") and getattr(item, "type") == "text":
                     txt = getattr(item, "text", "")
                     if isinstance(txt, str) and txt.strip():
                         texts.append(txt)
-                # Fallback, falls dict
+
                 elif isinstance(item, dict) and item.get("type") == "text":
                     txt = item.get("text", "")
                     if isinstance(txt, str) and txt.strip():
@@ -55,7 +57,7 @@ async def call_mcp_tool(tool_name: str, **kwargs) -> str:
 
 
 # =============================
-# Local Tools
+# Tools
 # =============================
 
 @tool(show_result=True, stop_after_tool_call=True)
@@ -76,6 +78,29 @@ def get_address_by_name(name: str) -> str:
     return f"Die Adresse von {name} lautet {address}."
 
 
+@tool(name="get_eth_chf_price", show_result=True, stop_after_tool_call=True)
+def get_eth_chf_price() -> str:
+    """
+    Ruft den aktuellen ETH/CHF-Kurs über eine öffentliche HTTP-API ab.
+    Gibt eine kurze, laienverständliche Erklärung zurück.
+    """
+    try:
+        response = requests.get(
+            "https://api.coingecko.com/api/v3/simple/price",
+            params={"ids": "ethereum", "vs_currencies": "chf"},
+            timeout=5,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        price = data["ethereum"]["chf"]
+        return f"1 ETH entspricht aktuell ungefähr {price:.2f} CHF (Quelle: CoinGecko)."
+
+    except Exception as e:
+        return f"Fehler beim Abrufen des ETH/CHF-Kurses: {e}"
+
+
+
 # =============================
 # Wrapper Tools for Confirmation
 # =============================
@@ -94,7 +119,6 @@ async def send_eth_hitl(to_address: str, amount_eth: float) -> str:
     if answer != "y":
         return "Die ETH-Transaktion wurde vom Nutzer abgebrochen."
 
-    # Wenn bestätigt → MCP-Tool aufrufen
     return await call_mcp_tool(
         "send_eth",
         to_address=to_address,
@@ -115,7 +139,6 @@ async def send_erc20_hitl(to_address: str, amount: float) -> str:
     if answer != "y":
         return "Die Token-Transaktion wurde vom Nutzer abgebrochen."
 
-    # Wenn bestätigt → MCP-Tool aufrufen
     return await call_mcp_tool(
         "send_erc20_token",
         to_address=to_address,
@@ -179,47 +202,74 @@ async def run_agent(message: str) -> None:
             debug_mode=True,
         )
 
+        #Price Agent
+        price_agent = Agent(
+            name="Price_Agent",
+            model=Ollama(id="qwen2.5:3b"),
+            tools=[get_eth_chf_price],
+            instructions=dedent("""
+            Du bist nur für Preisabfragen zuständig.
+
+            Wenn der Nutzer nach dem aktuellen Preis oder Kurs von ETH/Ethereum
+            in CHF fragt (z.B. "Wie viel ist 1 ETH in CHF wert?",
+            "Was ist der aktuelle Ethereum-Kurs?", "ETH/CHF Kurs"),
+            dann verwende IMMER das Tool get_eth_chf_price.
+
+            Antworte kurz, laienverständlich und nenne den Preis in CHF.
+            Füge gerne einen Hinweis hinzu, dass sich der Kurs laufend ändern kann.
+            """),
+            markdown=True,
+            debug_mode=True,
+        )
+
         #Agent Team
         team = Team(
             name="Ethereum_Assistant_Team",
-            members=[eth_agent, address_book_agent],
+            members=[eth_agent, address_book_agent, price_agent],
             model=Ollama(id="qwen3:8b"),
-    instructions=dedent("""
-    Du koordinierst zwei Agenten mit unterschiedlichen Tools.
+            instructions=dedent("""
+            Du koordinierst drei Agenten mit unterschiedlichen Tools.
 
-    Routing-Regeln:
-    - Wenn die Nutzerfrage Wörter wie "Abstimmung", "Proposal",
-      "Vote", "DAO", "Gewinner" enthält:
-      → Delegiere an den Agenten, der Tools wie dao_list_proposals,
-        dao_get_winner oder dao_vote besitzt.
-    - Wenn der Nutzer eine Person mit Namen nennt (z.B. "Joel", "Patrick")
-      und eine Adresse braucht:
-      → Delegiere an den Agenten, der das Tool get_address_by_name besitzt.
-    - Wenn der Nutzer eine Transaktion (ETH oder Token) ausführen will:
-      → Zuerst Name via get_address_by_name (falls Name),
-        danach an den Agenten mit send_eth_hitl / send_erc20_hitl.
+            Routing-Regeln:
+            - Wenn die Nutzerfrage Wörter wie "Abstimmung", "Proposal",
+            "Vote", "DAO", "Gewinner" enthält:
+            → Delegiere an den Agenten, der Tools wie dao_list_proposals,
+                dao_get_winner oder dao_vote besitzt.
+            - Wenn der Nutzer eine Person mit Namen nennt (z.B. "Joel", "Patrick")
+            und eine Adresse braucht:
+            → Delegiere an den Agenten, der das Tool get_address_by_name besitzt.
+            - Wenn der Nutzer eine Transaktion (ETH oder Token) ausführen will:
+            → Zuerst Name via get_address_by_name (falls Name),
+                danach an den Agenten mit send_eth_hitl / send_erc20_hitl.
+            - Wenn die Nutzerfrage nach dem Preis oder Kurs von ETH/Ethereum in CHF fragt
+            (z.B. "Wie viel ist 1 ETH in CHF wert?",
+            "Was ist der aktuelle Ethereum-Kurs?",
+            "ETH/CHF Kurs"):
+            → Delegiere an den Agenten, der das Tool get_eth_chf_price besitzt.
 
-    Nutze IMMER den Agenten mit den passenden Tools.
+            Nutze IMMER den Agenten mit den passenden Tools.
 
-    ------------------------------------------------------------
-    LAIENVERSTÄNDLICHE AUSGABEN:
-    ------------------------------------------------------------
-    - Formuliere die endgültige Antwort immer so,
-      dass sie auch für absolute Laien verständlich ist.
-    - Verwende klare, einfache Sprache. Kein Blockchain-Jargon.
-    - Erkläre kurz, was passiert ist (z.B. "Die Zahlung wurde ausgeführt"),
-      aber ohne technische Details wie Gas, Nonce, RPC, Toolnamen usw.
-    - Wenn eine Transaktion ausgeführt wurde:
-        • Erwähne Betrag und Empfänger.
-        • Gib den Transaktions-Hash an.
-        • Erkläre in einem Satz, dass der Hash ein "digitaler Beleg"
-          ist, mit dem man die Zahlung im Blockchain-Explorer prüfen kann.
-    - Bei DAO-Ergebnissen:
-        • Beschreibe kurz, worum es geht ("Abstimmung", "Vorschlag", "aktueller Stand").
-        • Keine internen Variablennamen oder Smart-Contract-Begriffe.
-    - Halte das Ergebnis immer kurz, freundlich und gut verständlich.
-    ------------------------------------------------------------
-    """),
+            ------------------------------------------------------------
+            LAIENVERSTÄNDLICHE AUSGABEN:
+            ------------------------------------------------------------
+            - Formuliere die endgültige Antwort immer so,
+            dass sie auch für absolute Laien verständlich ist.
+            - Verwende klare, einfache Sprache. Kein Blockchain-Jargon.
+            - Erkläre kurz, was passiert ist (z.B. "Die Zahlung wurde ausgeführt"),
+            aber ohne technische Details wie Gas, Nonce, RPC, Toolnamen usw.
+            - Wenn eine Transaktion ausgeführt wurde:
+                • Erwähne Betrag und Empfänger.
+                • Gib den Transaktions-Hash an.
+                • Erkläre in einem Satz, dass der Hash ein "digitaler Beleg"
+                ist, mit dem man die Zahlung im Blockchain-Explorer prüfen kann.
+            - Bei DAO-Ergebnissen:
+                • Beschreibe kurz, worum es geht ("Abstimmung", "Vorschlag", "aktueller Stand").
+                • Keine internen Variablennamen oder Smart-Contract-Begriffe.
+            - Bei Preisabfragen:
+                • Nenne klar den aktuellen ETH-Preis in CHF von dem Agenten der dir den Kurs gegeben hat. Du darfst keinen Kurs erfinden!
+            - Halte das Ergebnis immer kurz, freundlich und gut verständlich.
+            ------------------------------------------------------------
+            """),
             markdown=True,
             debug_mode=True,
         )
@@ -235,9 +285,5 @@ if __name__ == "__main__":
     #asyncio.run(run_agent("Was ist das Guthaben auf der Adresse 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266?"))
     #asyncio.run(run_agent("Bitte sende 1 ETH an die Adresse 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"))
     #asyncio.run(run_agent("Bitte überweise 1 Voltaze an die Adresse 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"))
-    asyncio.run(run_agent("Bitte überweise 0.5 ETH an die Adresse von Joel"))
-    #asyncio.run(run_agent("Bitte überweise 1 Voltaze an Patrick"))
-    #asyncio.run(run_agent("Welche Abstimmungen laufen aktuell?"))
-    #asyncio.run(run_agent("Wie lautet die Adresse von Dylan?"))
-    #asyncio.run(run_agent("Bitte überweise 1 Voltaze an Patrick"))
-    #asyncio.run(run_agent("Bitte überweise 1 Ethereum an Patrick"))
+    #asyncio.run(run_agent("Bitte überweise 0.5 ETH an die Adresse von Joel"))
+    asyncio.run(run_agent("Was ist Ethereum und was ist der aktuelle Kurs?"))
