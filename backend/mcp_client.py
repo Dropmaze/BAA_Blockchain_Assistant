@@ -8,13 +8,32 @@ from textwrap import dedent
 from agno.agent import Agent
 from agno.team import Team
 from agno.tools import tool
+from agno.knowledge.embedder.ollama import OllamaEmbedder
+from agno.knowledge.knowledge import Knowledge
 from agno.models.ollama import Ollama
 from agno.tools.mcp import MCPTools
 from agno.utils import pprint
 from mcp.client.stdio import stdio_client, StdioServerParameters
 from mcp.client.session import ClientSession
+from agno.vectordb.lancedb import LanceDb
 
+# =============================
+# Knowledge Base
+# =============================
 
+knowledge = Knowledge(
+    name="baa_knowledge",
+    vector_db=LanceDb(
+        table_name="baa_knowledge",
+        uri="lancedb_data",
+        embedder = OllamaEmbedder(id="openhermes"),
+    ),
+)
+
+#Add all files from the knowledge directory to the knowledge base
+knowledge.add_content(
+    path="C:/Users/Dylan/Desktop/BAA_Blockchain_Assistant/backend/knowledge"
+)
 
 # =============================
 # Helper Functions for Tool Calls
@@ -145,6 +164,9 @@ async def send_erc20_hitl(to_address: str, amount: float) -> str:
         amount=amount,
     )
 
+
+
+
 # =============================
 # Agent Runner
 # =============================
@@ -221,33 +243,76 @@ async def run_agent(message: str) -> None:
             markdown=True,
             debug_mode=True,
         )
+        
+        #Knowledge Agent
+        knowledge_agent = Agent(
+            name="Knowledge_Agent",
+            model=Ollama(id="qwen2.5:7b"),
+            knowledge=knowledge,
+            instructions=dedent("""
+            Du bist ein Erklär-Agent für Einsteiger.
+
+            WICHTIG:
+            - Du MUSST vor jeder Antwort ZUERST das Tool `search_knowledge_base`
+            mit der Nutzerfrage als Query aufrufen.
+            - Erst danach darfst du eine Antwort formulieren und dabei die gefundenen Inhalte
+            zusammenfassen.
+            - Antworte NIEMALS direkt, ohne vorher `search_knowledge_base` verwendet zu haben.
+            """),
+            search_knowledge=True,
+            markdown=True,
+            debug_mode=True,
+        )
 
         #Agent Team
         team = Team(
             name="Ethereum_Assistant_Team",
-            members=[eth_agent, address_book_agent, price_agent],
+            members=[eth_agent, address_book_agent, price_agent, knowledge_agent],
             model=Ollama(id="qwen3:8b"),
-            instructions=dedent("""
-            Du koordinierst drei Agenten mit unterschiedlichen Tools.
+            instructions = dedent("""
+            Du koordinierst vier Agenten mit unterschiedlichen Aufgaben und Tools.
 
-            Routing-Regeln:
+            Routing-Regeln (welcher Agent wann zuständig ist):
+
             - Wenn die Nutzerfrage Wörter wie "Abstimmung", "Proposal",
             "Vote", "DAO", "Gewinner" enthält:
             → Delegiere an den Agenten, der Tools wie dao_list_proposals,
-                dao_get_winner oder dao_vote besitzt.
+                dao_get_winner oder dao_vote besitzt (Ethereum_DAO_Agent).
+
             - Wenn der Nutzer eine Person mit Namen nennt (z.B. "Joel", "Patrick")
-            und eine Adresse braucht:
-            → Delegiere an den Agenten, der das Tool get_address_by_name besitzt.
+            und eine Krypto-Adresse braucht:
+            → Delegiere an den Agenten, der das Tool get_address_by_name besitzt
+                (Address_Book_Agent).
+
             - Wenn der Nutzer eine Transaktion (ETH oder Token) ausführen will:
-            → Zuerst Name via get_address_by_name (falls Name),
-                danach an den Agenten mit send_eth_hitl / send_erc20_hitl.
+            → Zuerst (falls nötig) Name via get_address_by_name auflösen,
+                danach an den Agenten mit send_eth_hitl / send_erc20_hitl delegieren
+                (Ethereum_DAO_Agent mit HITL-Wrappern).
+
             - Wenn die Nutzerfrage nach dem Preis oder Kurs von ETH/Ethereum in CHF fragt
             (z.B. "Wie viel ist 1 ETH in CHF wert?",
             "Was ist der aktuelle Ethereum-Kurs?",
             "ETH/CHF Kurs"):
-            → Delegiere an den Agenten, der das Tool get_eth_chf_price besitzt.
+            → Delegiere an den Agenten, der das Tool get_eth_chf_price besitzt
+                (Price_Agent). Du darfst keinen Kurs erfinden!
 
-            Nutze IMMER den Agenten mit den passenden Tools.
+            - Wenn der Nutzer nach Erklärungen, Grundlagen oder Definitionen fragt,
+            z.B.:
+            • "Was ist Ethereum?"
+            • "Was ist ein Smart Contract?"
+            • "Erkläre mir eine DAO."
+            • "Was bedeutet Voting / Abstimmung auf der Blockchain?"
+            oder allgemein "Erkläre mir das bitte einfach":
+            → Delegiere an den Agenten, der mit der Knowledge Base verbunden ist
+                (Knowledge_Agent, search_knowledge=True).
+
+            - Bei kombinierten Fragen (z.B. "Was ist Ethereum und wie ist der aktuelle Kurs?"):
+            → Zuerst Knowledge_Agent für die Erklärung nutzen,
+                danach Price_Agent für den aktuellen Kurs.
+            → Fasse die Ergebnisse laienverständlich in einer gemeinsamen Antwort zusammen.
+
+            Nutze IMMER den Agenten mit den passenden Tools und der passenden Rolle.
+            Du darfst mehrere Agenten nacheinander verwenden, wenn das für die Frage sinnvoll ist.
 
             ------------------------------------------------------------
             LAIENVERSTÄNDLICHE AUSGABEN:
@@ -256,18 +321,23 @@ async def run_agent(message: str) -> None:
             dass sie auch für absolute Laien verständlich ist.
             - Verwende klare, einfache Sprache. Kein Blockchain-Jargon.
             - Erkläre kurz, was passiert ist (z.B. "Die Zahlung wurde ausgeführt"),
-            aber ohne technische Details wie Gas, Nonce, RPC, Toolnamen usw.
+            aber ohne technische Details wie Gas, Nonce, RPC, interne Variablennamen oder Toolnamen.
             - Wenn eine Transaktion ausgeführt wurde:
-                • Erwähne Betrag und Empfänger.
-                • Gib den Transaktions-Hash an.
-                • Erkläre in einem Satz, dass der Hash ein "digitaler Beleg"
+            • Erwähne Betrag und Empfänger.
+            • Gib den Transaktions-Hash an.
+            • Erkläre in einem Satz, dass der Hash eine Art "digitaler Beleg"
                 ist, mit dem man die Zahlung im Blockchain-Explorer prüfen kann.
             - Bei DAO-Ergebnissen:
-                • Beschreibe kurz, worum es geht ("Abstimmung", "Vorschlag", "aktueller Stand").
-                • Keine internen Variablennamen oder Smart-Contract-Begriffe.
+            • Beschreibe kurz, worum es geht ("Abstimmung", "Vorschlag", "aktueller Stand").
+            • Keine internen Smart-Contract-Begriffe.
             - Bei Preisabfragen:
-                • Nenne klar den aktuellen ETH-Preis in CHF von dem Agenten der dir den Kurs gegeben hat. Du darfst keinen Kurs erfinden!
-            - Halte das Ergebnis immer kurz, freundlich und gut verständlich.
+            • Nenne klar den aktuellen ETH-Preis in CHF, wie er vom zuständigen Agenten
+                (Price_Agent) geliefert wurde. Du darfst keinen Kurs erfinden!
+            - Wenn Wissen aus der Knowledge Base genutzt wurde:
+            • Erkläre die Inhalte in eigenen, einfachen Worten
+                und halte die Antwort kurz und gut verständlich.
+
+            Halte das Ergebnis immer kurz, freundlich und gut verständlich.
             ------------------------------------------------------------
             """),
             markdown=True,
