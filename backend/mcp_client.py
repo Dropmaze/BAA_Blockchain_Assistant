@@ -1,6 +1,4 @@
-import asyncio
 import json
-import os
 import requests
 
 from pathlib import Path
@@ -21,6 +19,9 @@ from agno.vectordb.lancedb import LanceDb
 # Knowledge Base
 # =============================
 
+ROOT = Path(__file__).parent
+KNOWLEDGE_PATH = ROOT / "knowledge"
+
 knowledge = Knowledge(
     name="baa_knowledge",
     vector_db=LanceDb(
@@ -30,9 +31,8 @@ knowledge = Knowledge(
     ),
 )
 
-#Add all files from the knowledge directory to the knowledge base
 knowledge.add_content(
-    path="C:/Users/Dylan/Desktop/BAA_Blockchain_Assistant/backend/knowledge"
+    path=str(KNOWLEDGE_PATH)
 )
 
 # =============================
