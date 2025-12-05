@@ -171,14 +171,14 @@ async def send_erc20_hitl(to_address: str, amount: float) -> str:
 # Agent Runner
 # =============================
 
-async def run_agent(message: str) -> None:
+async def run_agent(message: str) -> str:
     """Führt das Agent-Team aus und verarbeitet eine Nutzeranfrage."""
 
     async with MCPTools("python mcp_server.py") as mcp_tools:
         
         #Ethereum Agent
         eth_agent = Agent(
-            name="Ethereum_DAO_Agent",
+            name="Ethereum_Agent",
             model=Ollama(id="qwen2.5:3b"),
             tools=[mcp_tools, send_eth_hitl, send_erc20_hitl],
             instructions=dedent("""
@@ -268,9 +268,9 @@ async def run_agent(message: str) -> None:
         team = Team(
             name="Ethereum_Assistant_Team",
             members=[eth_agent, address_book_agent, price_agent, knowledge_agent],
-            model=Ollama(id="qwen3:8b"),
+            model=Ollama(id="qwen2.5:7b"),
             instructions = dedent("""
-            Du koordinierst vier Agenten mit unterschiedlichen Aufgaben und Tools.
+            Du koordinierst vier Agenten mit unterschiedlichen Aufgaben und Tools und antwortest nur auf Deutsch.
 
             Routing-Regeln (welcher Agent wann zuständig ist):
 
@@ -343,17 +343,20 @@ async def run_agent(message: str) -> None:
             markdown=True,
             debug_mode=True,
         )
-
         run_response = await team.arun(message)
-        pprint.pprint_run_response(run_response)
+
+        if hasattr(run_response, "content") and isinstance(run_response.content, str):
+            return run_response.content
+
+        return str(run_response)
 
 
 # =============================
 # Example usage
 # =============================
-if __name__ == "__main__":
+#if __name__ == "__main__":
     #asyncio.run(run_agent("Was ist das Guthaben auf der Adresse 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266?"))
     #asyncio.run(run_agent("Bitte sende 1 ETH an die Adresse 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"))
     #asyncio.run(run_agent("Bitte überweise 1 Voltaze an die Adresse 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"))
     #asyncio.run(run_agent("Bitte überweise 0.5 ETH an die Adresse von Joel"))
-    asyncio.run(run_agent("Was ist Ethereum und was ist der aktuelle Kurs?"))
+    #asyncio.run(run_agent("Was ist Ethereum und was ist der aktuelle Kurs?"))
