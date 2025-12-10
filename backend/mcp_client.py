@@ -30,7 +30,7 @@ knowledge = Knowledge(
     vector_db=LanceDb(
         table_name="baa_knowledge",
         uri="lancedb_data",
-        embedder = OllamaEmbedder(id="openhermes"),
+        embedder = OllamaEmbedder(id="openhermes", host="http://localhost:11434"),
     ),
 )
 
@@ -96,7 +96,7 @@ async def run_agent(message: str, session_id: str | None = None) -> str:
         #Ethereum Agent - handles real blockchain operations via MCP server
         eth_agent = Agent(
             name="Ethereum_Agent",
-            model=Ollama(id="qwen2.5:7b"),
+            model=Ollama(id="qwen2.5:7b", host="http://localhost:11434"),
             tools=[mcp_tools], # Provides access to onchain commands
             instructions=dedent("""
             Du bist Ethereum- und DAO-Assistent.
@@ -126,7 +126,7 @@ async def run_agent(message: str, session_id: str | None = None) -> str:
         #Adress Book Agent - resolves names to wallet addresses
         address_book_agent = Agent(
             name="Address_Book_Agent",
-            model=Ollama(id="qwen2.5:3b"),
+            model=Ollama(id="qwen2.5:3b", host="http://localhost:11434"),
             tools=[get_address_by_name],
             instructions=dedent("""
             Du bist nur für das Nachschlagen von Krypto-Adressen zuständig.
@@ -146,7 +146,7 @@ async def run_agent(message: str, session_id: str | None = None) -> str:
         #Price Agent - provides ETH/CHF exchange rate via CoinGecko API
         price_agent = Agent(
             name="Price_Agent",
-            model=Ollama(id="qwen2.5:3b"),
+            model=Ollama(id="qwen2.5:3b", host="http://localhost:11434"),
             tools=[get_eth_chf_price],
             instructions=dedent("""
             Du bist nur für ETH/CHF-Preisabfragen zuständig.
@@ -165,7 +165,7 @@ async def run_agent(message: str, session_id: str | None = None) -> str:
         #Knowledge Agent - provides friendly explanations using the custom knowledge base
         knowledge_agent = Agent(
             name="Knowledge_Agent",
-            model=Ollama(id="qwen2.5:3b"),
+            model=Ollama(id="qwen2.5:3b", host="http://localhost:11434"),
             knowledge=knowledge,
             instructions=dedent("""
             Du bist ein Erklär-Agent für Einsteiger zu Ethereum, Blockchain, Smart Contracts, DAOs usw.

@@ -1,6 +1,0 @@
-[theme]
-primaryColor = "#627EEA"             # Ethereum-Lila
-backgroundColor = "#0A0D14"          # Sehr dunkler Hintergrund
-secondaryBackgroundColor = "#111620" # Panels / Sidebar
-textColor = "#ECECEC"                # Helles Grau
-font = "sans serif"
