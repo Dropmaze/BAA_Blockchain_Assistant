@@ -6,7 +6,7 @@ import uuid
 # -----------------------------
 # Page config
 # -----------------------------
-st.set_page_config(page_title="Ethereum Assistant", page_icon="֍")
+st.set_page_config(page_title="Ethereum Assistant", page_icon="❉")
 
 # -----------------------------
 # Lightweight custom styling (CSS)
@@ -70,17 +70,20 @@ with st.sidebar:
     st.markdown("---")
 
     st.header("🔐 Hinweis")
-    st.write(
+    st.markdown(
         """
-Dieser Assistant ist ein Prototyp für eine Bachelorarbeit.
-Bitte triff keine finanziellen Entscheidungen nur aufgrund dieser Antworten.
+    **Dieser Assistant ist ein Prototyp im Rahmen einer Bachelorarbeit.**
+
+    - Alle Interaktionen erfolgen in einer Testumgebung  
+    - Keine realen Vermögenswerte werden übertragen
+    - Keine finanzielle Entscheidungsgrundlage
         """
     )
 
 # -----------------------------
 # Main title and caption
 # -----------------------------
-st.title("֍ Ethereum Assistant")
+st.title("❉ Ethereum Assistant")
 st.caption("Interagiere in natürlicher Sprache mit der Blockchain.")
 
 # -----------------------------
@@ -102,8 +105,10 @@ for msg in st.session_state.messages:
 # Show hint when no chat exists yet
 if len(st.session_state.messages) == 0:
     st.info(
-        "👋 Willkommen! Du kannst Fragen zu Ethereum, Smart Contracts oder DAOs stellen. "
-        "Die wichtigsten Schnellaktionen findest du links in der Seitenleiste."
+        "👋 Willkommen! Stelle Fragen zu Ethereum, Smart Contracts & DAOs, "
+        "führe Transaktionen aus und nimm an Abstimmungen teil."
+        "Schnellaktionen findest du links in der Seitenleiste.\n\n"
+        "Sonst einfach Fragen und ich helfe dir gerne weiter!"
     )
 
 # -----------------------------
@@ -121,4 +126,18 @@ if prompt_to_use:
     # Store and display user message
     st.session_state.messages.append({"role": "user", "content": prompt_to_use})
     with st.chat_message("user"):
-        st
+        st.markdown(prompt_to_use)
+
+    # Get assistant response
+    with st.chat_message("assistant"):
+        with st.spinner("Agenten-Team denkt nach ..."):
+            response_text = asyncio.run(
+                run_agent(
+                    prompt_to_use,
+                    session_id=st.session_state.session_id,
+                )
+            )
+            st.markdown(response_text)
+
+    # Store response in chat history
+    st.session_state.messages.append({"role": "assistant", "content": response_text})
