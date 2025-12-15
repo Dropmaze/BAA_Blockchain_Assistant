@@ -7,6 +7,7 @@ from agno.agent import Agent
 from agno.team import Team
 from agno.tools import tool
 from agno.knowledge.embedder.ollama import OllamaEmbedder
+from agno.knowledge.embedder.openai import OpenAIEmbedder
 from agno.knowledge.knowledge import Knowledge
 from agno.models.ollama import Ollama
 from agno.models.openai import OpenAIChat
@@ -30,7 +31,8 @@ knowledge = Knowledge(
     vector_db=LanceDb(
         table_name="baa_knowledge",
         uri="lancedb_data",
-        embedder = OllamaEmbedder(id="openhermes", host="http://localhost:11434"),
+        embedder=OpenAIEmbedder(),
+        #embedder = OllamaEmbedder(id="openhermes", host="http://localhost:11434"),     #If agent should run locally, use this line.
     ),
 )
 
@@ -181,7 +183,8 @@ async def run_agent(message: str, session_id: str | None = None) -> str:
         #Knowledge Agent - provides friendly explanations using the custom knowledge base
         knowledge_agent = Agent(
             name="Knowledge_Agent",
-            model=Ollama(id="qwen2.5:7b", host="http://localhost:11434"),
+            #model=Ollama(id="qwen2.5:7b", host="http://localhost:11434"),    #If agent should run locally, use this line.
+            model=OpenAIChat(id="gpt-4o-mini"),
             knowledge=knowledge,
             instructions=dedent("""
             Du bist ein Erklär-Agent für Einsteiger zu Ethereum, Blockchain, Smart Contracts, DAOs usw.
