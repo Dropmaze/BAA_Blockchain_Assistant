@@ -98,7 +98,8 @@ async def run_agent(message: str, session_id: str | None = None) -> str:
         #Ethereum Agent - handles real blockchain operations via MCP server
         eth_agent = Agent(
             name="Ethereum_Agent",
-            model=Ollama(id="qwen2.5:7b", host="http://localhost:11434"),
+            #model=Ollama(id="qwen2.5:7b", host="http://localhost:11434"),    #If agent should run locally, use this line.
+            model=OpenAIChat(id="gpt-4o-mini"),
             tools=[mcp_tools],
             instructions=dedent("""
             Du bist Ethereum- und DAO-Assistent.
@@ -114,8 +115,7 @@ async def run_agent(message: str, session_id: str | None = None) -> str:
             - Du stellst KEINE weiteren Rückfragen zur Bestätigung.
 
             - Du führst send_eth und send_erc20_token NUR aus,
-              wenn der Teamleiter dich explizit zur AUSFÜHRUNG beauftragt
-              (z.B. "Führe jetzt aus", "Bitte senden", "Transaktion ausführen").
+              wenn der Teamleiter dich dazu beauftragt. 
 
             - Wenn der Teamleiter in PHASE 1 eine Gebühren-/Gas-Schätzung verlangt:
               - Nutze get_network_gas_price.
@@ -144,7 +144,8 @@ async def run_agent(message: str, session_id: str | None = None) -> str:
         #Adress Book Agent - resolves names to wallet addresses
         address_book_agent = Agent(
             name="Address_Book_Agent",
-            model=Ollama(id="qwen2.5:3b", host="http://localhost:11434"),
+            #model=Ollama(id="qwen2.5:3b", host="http://localhost:11434"),    #If agent should run locally, use this line.
+            model=OpenAIChat(id="gpt-4o-mini"),
             tools=[get_address_by_name],
             instructions=dedent("""
             Du bist nur für das Nachschlagen von Krypto-Adressen zuständig.
@@ -164,7 +165,8 @@ async def run_agent(message: str, session_id: str | None = None) -> str:
         #Price Agent - provides ETH/CHF exchange rate via CoinGecko API
         price_agent = Agent(
             name="Price_Agent",
-            model=Ollama(id="qwen2.5:3b", host="http://localhost:11434"),
+            #model=Ollama(id="qwen2.5:3b", host="http://localhost:11434"),    #If agent should run locally, use this line.
+            model=OpenAIChat(id="gpt-4o-mini"),
             tools=[get_eth_chf_price],
             instructions=dedent("""
             Du bist nur für ETH/CHF-Preisabfragen zuständig.
@@ -227,6 +229,7 @@ async def run_agent(message: str, session_id: str | None = None) -> str:
             - Der Price_Agent ist ausschließlich für ETH/CHF zuständig.
             - Tokenpreise (ERC20) werden NICHT über den Price_Agent abgefragt.
             - Für Token-Transaktionen sind Preisangaben in CHF optional und werden standardmäßig NICHT verlangt.
+            - Sofern nicht explizit nach einem Kontostand oder Guthaben gefragt kümmerst du dich nicht um die Abfrage von einem solchen.
 
             ========================
             TRANSAKTIONSABLÄUFE (ETH & ERC20)
@@ -247,7 +250,7 @@ async def run_agent(message: str, session_id: str | None = None) -> str:
 
             2) Transaktionsart erkennen
             - ETH-Transaktion: Nutzer schreibt ETH/Ether oder nennt ETH eindeutig.
-            - ERC20-Transaktion: Nutzer nennt "Token" oder einen Tokennamen (z.B. "Voltaze Token") oder sagt explizit ERC20.
+            - ERC20-Transaktion: Nutzer nennt "Token" oder einen Tokennamen (z.B. "Voltaze Token", "VLZ") oder sagt explizit ERC20.
 
             3) Gebühren/Gas & Zusatzinfos beschaffen (PFLICHT)
             - Bevor du die Phase-1-Zusammenfassung formulierst,
@@ -262,7 +265,7 @@ async def run_agent(message: str, session_id: str | None = None) -> str:
             - ERC20-Transaktion:
               - KEINE CHF-Preisabfrage über Price_Agent.
               - Netzwerkgebühren über Ethereum_Agent.
-              - Falls nötig: Token-Balance/Token-Infos über Ethereum_Agent (ohne Toolnamen zu erwähnen).
+              - Für die Überweisung/Transaktion muss das Guthaben nicht geprüft werden - weder bei dem Sender noch beim Empfänger.
 
             4) Phase-1-Zusammenfassung formulieren (immer laienverständlich)
             - ETH-Transaktion (Beispiel):
