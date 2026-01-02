@@ -98,8 +98,8 @@ async def run_agent(message: str, session_id: str | None = None) -> str:
         #Ethereum Agent - handles real blockchain operations via MCP server
         eth_agent = Agent(
             name="Ethereum_Agent",
-            #model=Ollama(id="qwen2.5:7b", host="http://localhost:11434"),    #If agent should run locally, use this line.
-            model=OpenAIChat(id="gpt-4o-mini"),
+            model=Ollama(id="qwen2.5:3b", host="http://localhost:11434"),    #If agent should run locally, use this line.
+            #model=OpenAIChat(id="gpt-4o-mini"),
             tools=[mcp_tools],
             instructions=dedent("""
             Du bist Ethereum- und DAO-Assistent.
@@ -144,14 +144,14 @@ async def run_agent(message: str, session_id: str | None = None) -> str:
         #Adress Book Agent - resolves names to wallet addresses
         address_book_agent = Agent(
             name="Address_Book_Agent",
-            #model=Ollama(id="qwen2.5:3b", host="http://localhost:11434"),    #If agent should run locally, use this line.
-            model=OpenAIChat(id="gpt-4o-mini"),
+            model=Ollama(id="qwen2.5:3b", host="http://localhost:11434"),    #If agent should run locally, use this line.
+            #model=OpenAIChat(id="gpt-4o-mini"),
             tools=[get_address_by_name],
             instructions=dedent("""
             Du bist nur für das Nachschlagen von Krypto-Adressen zuständig.
 
             Regeln:
-            - Verwende ausschließlich das Tool get_address_by_name.
+            - Verwende ausschliesslich das Tool get_address_by_name.
             - Keine Erklärungen zu Blockchain, DAO, Transaktionen etc.
             - Antworte nur mit:
               - gefundener Adresse oder
@@ -165,8 +165,8 @@ async def run_agent(message: str, session_id: str | None = None) -> str:
         #Price Agent - provides ETH/CHF exchange rate via CoinGecko API
         price_agent = Agent(
             name="Price_Agent",
-            #model=Ollama(id="qwen2.5:3b", host="http://localhost:11434"),    #If agent should run locally, use this line.
-            model=OpenAIChat(id="gpt-4o-mini"),
+            model=Ollama(id="qwen2.5:3b", host="http://localhost:11434"),    #If agent should run locally, use this line.
+            #model=OpenAIChat(id="gpt-4o-mini"),
             tools=[get_eth_chf_price],
             instructions=dedent("""
             Du bist nur für ETH/CHF-Preisabfragen zuständig.
@@ -185,8 +185,8 @@ async def run_agent(message: str, session_id: str | None = None) -> str:
         #Knowledge Agent - provides friendly explanations using the custom knowledge base
         knowledge_agent = Agent(
             name="Knowledge_Agent",
-            #model=Ollama(id="qwen2.5:7b", host="http://localhost:11434"),    #If agent should run locally, use this line.
-            model=OpenAIChat(id="gpt-4o-mini"),
+            model=Ollama(id="qwen2.5:3b", host="http://localhost:11434"),    #If agent should run locally, use this line.
+            #model=OpenAIChat(id="gpt-4o-mini"),
             knowledge=knowledge,
             instructions=dedent("""
             Du bist ein Erklär-Agent für Einsteiger zu Ethereum, Blockchain, Smart Contracts, DAOs usw.
@@ -205,7 +205,8 @@ async def run_agent(message: str, session_id: str | None = None) -> str:
         team = Team(
             name="Ethereum_Assistant_Team",
             members=[eth_agent, address_book_agent, price_agent, knowledge_agent],
-            model=OpenAIChat(id="gpt-4o-mini"),
+            model=Ollama(id="gpt-oss:20b", host="http://localhost:11434"),    #If agent should run locally use this line. Delete localhost for ollama cloud model
+            #model=OpenAIChat(id="gpt-4o-mini"),
             instructions=dedent("""
             Du koordinierst vier Agenten (Ethereum, Address Book, Price, Knowledge) und antwortest nur auf Deutsch.
 
@@ -226,10 +227,9 @@ async def run_agent(message: str, session_id: str | None = None) -> str:
               → Erst Knowledge_Agent (Erklärung), dann Price_Agent (Kurs).
 
             WICHTIG:
-            - Der Price_Agent ist ausschließlich für ETH/CHF zuständig.
+            - Der Price_Agent ist ausschliesslich für ETH/CHF zuständig.
             - Tokenpreise (ERC20) werden NICHT über den Price_Agent abgefragt.
-            - Für Token-Transaktionen sind Preisangaben in CHF optional und werden standardmäßig NICHT verlangt.
-            - Sofern nicht explizit nach einem Kontostand oder Guthaben gefragt kümmerst du dich nicht um die Abfrage von einem solchen.
+            - Für Token-Transaktionen sind Preisangaben in CHF optional und werden standardmässig NICHT verlangt.
 
             ========================
             TRANSAKTIONSABLÄUFE (ETH & ERC20)
@@ -329,7 +329,7 @@ async def run_agent(message: str, session_id: str | None = None) -> str:
               Zu JEDER Antwort fügst du am Ende genau EINE kurze Alltagsanalogie hinzu.
 
               Ziel:
-              Die Analogie dient ausschließlich der Einordnung für Laien.
+              Die Analogie dient ausschliesslich der Einordnung für Laien.
               Die Antwort muss auch OHNE Analogie vollständig korrekt und verständlich sein.
 
               Regeln:
