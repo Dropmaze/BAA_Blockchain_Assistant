@@ -45,6 +45,8 @@ Der Fokus liegt auf einem Proof of Concept und nicht auf einer produktiven Anwen
 
 ## Voraussetzungen (Windows)
 
+Folgende Software muss lokal installiert sein:
+
 - Python >= 3.10
 - Node.js >= 18
 - npm
@@ -151,6 +153,9 @@ Verwendung im Projekt:
 
 - gpt-oss:20b
   Team-Leader-Agent zur Koordination und Entscheidungslogik
+
+> Hinweis: Ollama muss lokal installiert **und gestartet** sein, bevor die Anwendung ausgeführt wird.  
+> Nach der Installation läuft Ollama im Hintergrund als lokaler Dienst.
 
 ---
 
