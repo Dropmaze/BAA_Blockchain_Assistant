@@ -98,6 +98,8 @@ npm install --save-dev hardhat
 
 ### 5. Lokales Blockchain-Netzwerk starten
 
+> Hinweis: `npx hardhat node` muss dauerhaft laufen (es simuliert das lokale Testnet). Bitte dafür ein eigenes Terminal-Fenster verwenden.
+
 ```powershell
 npx hardhat node
 ```
@@ -119,6 +121,7 @@ npx hardhat run scripts/deploy_dao_ballot.js --network localhost
 ### 7. Environment konfigurieren
 
 ```powershell
+cd backend
 copy .env.example .env
 ```
 
@@ -167,11 +170,13 @@ $Env:OLLAMA_API_KEY="DEIN_API_KEY"
 
 ## 9. Anwendung starten
 
-## Hinweis:
-Der MCP-Server wird automatisch vom Backend gestartet (stdio-Modus),
-es ist kein separates Starten von mcp_server.py erforderlich.
+> Hinweis: Der MCP-Server wird automatisch vom Backend im `stdio`-Modus gestartet.  
+> Ein separates Starten von `mcp_server.py` ist nicht erforderlich.
+
+Stelle sicher, dass die virtuelle Python-Umgebung aktiv ist:
 
 ```powershell
 cd backend
+venv\Scripts\activate
 streamlit run app.py
 ```
