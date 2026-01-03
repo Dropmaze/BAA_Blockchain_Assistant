@@ -51,7 +51,7 @@ Folgende Software muss lokal installiert sein:
 - Node.js >= 18
 - npm
 - Git
-- Ollama (https://ollama.com)
+- Ollama (https://ollama.com/download)
 - Hardhat
 
 ---
@@ -139,6 +139,9 @@ Danach die Datei .env manuell anpassen.
 
 Der Prototyp verwendet lokal ausgeführte Large Language Models von Ollama.
 
+> Hinweis: Ollama Launcher (https://ollama.com/download) muss lokal installiert **und gestartet** sein bevor die Modelle via Powershell heruntergeladen werden können.
+> Nach der Installation läuft Ollama im Hintergrund als lokaler Dienst.
+
 Bitte stelle sicher, dass die folgenden Modelle lokal installiert sind:
 
 ```powershell
@@ -157,9 +160,6 @@ Verwendung im Projekt:
 
 - gpt-oss:20b
   Team-Leader-Agent zur Koordination und Entscheidungslogik
-
-> Hinweis: Ollama muss lokal installiert **und gestartet** sein, bevor der Prototyp ausgeführt wird.  
-> Nach der Installation läuft Ollama im Hintergrund als lokaler Dienst.
 
 ---
 
