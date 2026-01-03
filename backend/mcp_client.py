@@ -98,7 +98,7 @@ async def run_agent(message: str, session_id: str | None = None) -> str:
         #Ethereum Agent - handles real blockchain operations via MCP server
         eth_agent = Agent(
             name="Ethereum_Agent",
-            model=Ollama(id="qwen2.5:3b", host="http://localhost:11434"),    #If agent should run locally, use this line.
+            model=Ollama(id="qwen2.5:3b", host="http://localhost:11434"),    #If agent should run locally on ollama model use this line.
             #model=OpenAIChat(id="gpt-4o-mini"),
             tools=[mcp_tools],
             instructions=dedent("""
@@ -144,7 +144,7 @@ async def run_agent(message: str, session_id: str | None = None) -> str:
         #Adress Book Agent - resolves names to wallet addresses
         address_book_agent = Agent(
             name="Address_Book_Agent",
-            model=Ollama(id="qwen2.5:3b", host="http://localhost:11434"),    #If agent should run locally, use this line.
+            model=Ollama(id="qwen2.5:3b", host="http://localhost:11434"),    #If agent should run locally on ollama model use this line.
             #model=OpenAIChat(id="gpt-4o-mini"),
             tools=[get_address_by_name],
             instructions=dedent("""
@@ -165,7 +165,7 @@ async def run_agent(message: str, session_id: str | None = None) -> str:
         #Price Agent - provides ETH/CHF exchange rate via CoinGecko API
         price_agent = Agent(
             name="Price_Agent",
-            model=Ollama(id="qwen2.5:3b", host="http://localhost:11434"),    #If agent should run locally, use this line.
+            model=Ollama(id="qwen2.5:3b", host="http://localhost:11434"),    #If agent should run locally on ollama model use this line.
             #model=OpenAIChat(id="gpt-4o-mini"),
             tools=[get_eth_chf_price],
             instructions=dedent("""
@@ -185,15 +185,15 @@ async def run_agent(message: str, session_id: str | None = None) -> str:
         #Knowledge Agent - provides friendly explanations using the custom knowledge base
         knowledge_agent = Agent(
             name="Knowledge_Agent",
-            model=Ollama(id="qwen2.5:3b", host="http://localhost:11434"),    #If agent should run locally, use this line.
-            #model=OpenAIChat(id="gpt-4o-mini"),
+            model=Ollama(id="qwen2.5:7b", host="http://localhost:11434"),    #If agent should run locally on ollama model use this line.
+            #model=OpenAIChat(id="gpt-4o-mini"), #
             knowledge=knowledge,
             instructions=dedent("""
             Du bist ein Erklär-Agent für Einsteiger zu Ethereum, Blockchain, Smart Contracts, DAOs usw.
 
             WICHTIG:
             - Vor jeder Antwort MUSST du zuerst die Knowledge Base über search_knowledge_base
-              mit der Nutzerfrage durchsuchen (dies passiert automatisch).
+              mit der Nutzerfrage durchsuchen.
             - Keine direkte Antwort ohne Knowledge-Suche.
             """),
             search_knowledge=True,
@@ -205,7 +205,7 @@ async def run_agent(message: str, session_id: str | None = None) -> str:
         team = Team(
             name="Ethereum_Assistant_Team",
             members=[eth_agent, address_book_agent, price_agent, knowledge_agent],
-            model=Ollama(id="gpt-oss:20b", host="http://localhost:11434"),    #If agent should run locally use this line. Delete localhost for ollama cloud model
+            model=Ollama(id="gpt-oss:20b", host="http://localhost:11434"),    #If agent should run locally use this line. Delete "localhost" line for ollama cloud model
             #model=OpenAIChat(id="gpt-4o-mini"),
             instructions=dedent("""
             Du koordinierst vier Agenten (Ethereum, Address Book, Price, Knowledge) und antwortest nur auf Deutsch.

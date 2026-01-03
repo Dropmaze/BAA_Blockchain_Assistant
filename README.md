@@ -137,24 +137,28 @@ Danach die Datei .env manuell anpassen.
 
 ## 8. LLM-Modelle (Ollama)
 
-Der Prototyp verwendet lokal ausgeführte Large Language Models über Ollama.
+Der Prototyp verwendet lokal ausgeführte Large Language Models von Ollama.
 
 Bitte stelle sicher, dass die folgenden Modelle lokal installiert sind:
 
 ```powershell
 ollama pull qwen2.5:3b
+ollama pull qwen2.5:7b
 ollama pull gpt-oss:20b
 ```
 
 Verwendung im Projekt:
 
 - qwen2.5:3b
-  Spezialisierte Agenten (Ethereum, Knowledge, Price, Address Book)
+(Ethereum-, Price-, Address Book Agent)
+
+- qwen2.5:7b
+(Knowledge Agent)
 
 - gpt-oss:20b
   Team-Leader-Agent zur Koordination und Entscheidungslogik
 
-> Hinweis: Ollama muss lokal installiert **und gestartet** sein, bevor die Anwendung ausgeführt wird.  
+> Hinweis: Ollama muss lokal installiert **und gestartet** sein, bevor der Prototyp ausgeführt wird.  
 > Nach der Installation läuft Ollama im Hintergrund als lokaler Dienst.
 
 ---
@@ -165,9 +169,8 @@ Standardmässig läuft der Team-Leader Agent lokal über das Ollama-Modell `gpt-
 Alternativ kann der Team-Leader über Ollama Cloud betrieben werden wenn die eigene Hardware zu wenig Leistung aufweist.
 
 Voraussetzungen:
-- Kostenlosen Account auf ollama.com erstellen und einen API-Key generieren.
+- Kostenlosen Account auf ollama.com erstellen und einen API-Key generieren. Diesen dann mit dem folgenden Befehl erfassen:
 
-Konfiguration:
 ```powershell
 $Env:OLLAMA_API_KEY="DEIN_API_KEY"
 ```
