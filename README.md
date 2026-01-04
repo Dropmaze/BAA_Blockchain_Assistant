@@ -51,7 +51,7 @@ Folgende Software muss lokal installiert sein:
 - Node.js >= 18
 - npm
 - Git
-- Ollama (https://ollama.com/download)
+- Ollama
 - Hardhat
 
 ---
@@ -184,11 +184,14 @@ Standardmässig läuft der Team-Leader Agent lokal über das Ollama-Modell `gpt-
 Alternativ kann der Team-Leader über Ollama Cloud betrieben werden wenn die eigene Hardware zu wenig Leistung aufweist.
 
 Voraussetzungen:
-- Kostenlosen Account auf ollama.com erstellen und einen API-Key generieren. Diesen dann mit dem folgenden Befehl erfassen:
+- Kostenlosen Account auf ollama.com erstellen und einen API-Key generieren. Diesen dann mit dem folgenden Befehl bevor start der Anwendung erfassen:
 
 ```powershell
-$Env:OLLAMA_API_KEY="DEIN_API_KEY"
+setx OLLAMA_API_KEY "DEIN_API_KEY"
 ```
+
+Zudem im Code beim Team Leader (Zeile 208) die folgende Zeile löschen -> "host="http://localhost:11434"
+
 ---
 
 ## 9. Anwendung starten
