@@ -31,8 +31,8 @@ knowledge = Knowledge(
     vector_db=LanceDb(
         table_name="baa_knowledge",
         uri="lancedb_data",
-        embedder=OpenAIEmbedder(),
-        #embedder = OllamaEmbedder(id="openhermes", host="http://localhost:11434"),     #If agent should run locally, use this line.
+        #embedder=OpenAIEmbedder(),
+        embedder=OllamaEmbedder(id="openhermes", host="http://localhost:11434"),
     ),
 )
 

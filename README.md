@@ -147,6 +147,7 @@ Bitte stelle sicher, dass die folgenden Modelle lokal installiert sind:
 ```powershell
 ollama pull qwen2.5:3b
 ollama pull qwen2.5:7b
+ollama pull openhermes:latest
 ollama pull gpt-oss:20b
 ```
 
@@ -155,7 +156,7 @@ Verwendung im Projekt:
 - qwen2.5:3b
 (Ethereum-, Price-, Address Book Agent)
 
-- qwen2.5:7b
+- qwen2.5:7b & openhermes:latest
 (Knowledge Agent)
 
 - gpt-oss:20b
@@ -187,4 +188,20 @@ Stelle sicher, dass die virtuelle Python-Umgebung aktiv ist:
 cd backend
 venv\Scripts\activate
 streamlit run app.py
+```
+
+### Agenten-Team verhält sich inkonsistent nach mehreren Anfragen
+
+In seltenen Fällen kann es vorkommen, dass sich das Agenten-Team nach vielen
+aufeinanderfolgenden Nutzeranfragen nicht mehr korrekt verhält
+
+**Ursache:**
+Der Team-Leader verwendet ein persistentes Multi-Turn-Memory um Konversationen über mehrere Anfragen hinweg zu speichern.
+Bei längeren Sessions kann dieses Memory unerwünschte Seiteneffekte verursachen.
+
+**Workaround:**
+Das Problem lässt sich beheben, indem das Team-Memory manuell gelöscht wird:
+
+```powershell
+backend\tmp\ethereum_team.db
 ```
