@@ -33,7 +33,7 @@ Der Fokus liegt auf einem Proof of Concept und nicht auf einer produktiven Anwen
 
 ---
 
-## Architektur (vereinfacht)
+## Architektur
 
 - Frontend: Streamlit Web Interface
 - Backend: Agenten-Team (Agno) + MCP-Client
@@ -132,6 +132,20 @@ Danach die Datei .env manuell anpassen.
 - RPC URL: Wird beim Start des Hardhat-Nodes in der Konsole angezeigt (z.B. http://127.0.0.1:8545)
 - Contract-Adressen: Werden beim Deployment der Smart Contracts in der Konsole ausgegeben
 
+### Adressbuch & Whitelists 
+
+Der Blockchain Assistant verwendet ein lokales **Adressbuch**, um Personennamen eindeutig auf Ethereum-Adressen abzubilden.
+
+Vorgehen:
+
+1. Öffne die Datei `backend/address_book.json`
+2. Wähle eine vorhandene Adresse
+3. Trage die gewünschte Adresse in der `.env`-Datei ein:
+
+```env
+ETH_WHITELIST=0xABC123...
+ERC20_WHITELIST=0xABC123...
+```
 
 ---
 
