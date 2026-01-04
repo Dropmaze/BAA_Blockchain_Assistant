@@ -194,6 +194,27 @@ Zudem im Code beim Team Leader (Zeile 208) die folgende Zeile löschen -> "host=
 
 ---
 
+
+## Wichtiger Hinweis: Clean Start nach .env-Änderungen (MCP-Verbindung)
+
+Wenn du die `.env` angepasst hast (Private Key, RPC URL, Contract-Adressen, Whitelists),
+musst du **alle laufenden Terminals/Prozesse vollständig beenden** und die Umgebung
+**frisch** starten, sonst kann die MCP-Toolkit-Verbindung sporadisch fehlschlagen.
+
+**Empfohlener Ablauf:**
+1. **Alle laufenden Terminals und IDEs schliessen**.
+2. Hardhat Node neu starten:
+   `npx hardhat node`
+3. Contracts deployen (die Contract-Adressen bleiben in diesem Setup konstant):
+   `npx hardhat run scripts/deploy_voltaze_token.js --network localhost`
+   `npx hardhat run scripts/deploy_dao_ballot.js --network localhost`
+4. Erst danach mit Schritt 9 fortfahren.
+
+Hinweis:
+Hardhat erzeugt im lokalen Testnetz deterministische Contract-Adressen, da diese
+aus der Deployer-Adresse und dem Nonce-Wert berechnet werden.
+
+
 ## 9. Anwendung starten
 
 > Hinweis: Der MCP-Server wird automatisch vom Backend im `stdio`-Modus gestartet.  
